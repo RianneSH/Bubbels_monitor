@@ -6,7 +6,14 @@ import streamlit as st
 from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="BabyTracker")
+
+st.set_page_config(
+    page_title="Bubbel",
+    page_icon="🫧",  # Bubble-emoji als tabbladicoon
+    layout="wide"
+)
+
+
 
 # ------------------------------
 # Google Sheets verbinding
@@ -129,7 +136,7 @@ tabs = st.tabs(["Dashboard", "Slaap", "Voeding", "Luiers", "Voorraad", "Gezondhe
 # TAB: Dashboard
 # ------------------------------
 with tabs[0]:
-    st.title("💖 Bubbels monitor")
+    st.title("🫧 Bubbels monitor")
     data = dashboard_data()
 
     st.subheader("💤 Laatste slaap")

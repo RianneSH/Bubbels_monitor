@@ -234,20 +234,36 @@ with tabs[3]:
         st.success("Luier toegevoegd en voorraad bijgewerkt!")
 
 # ------------------------------
-# TAB: Voorraad beheren
+# TAB: Voorraad
 # ------------------------------
 with tabs[5]:
     st.title("📦 Voorraad beheren")
+    
+    # Huidige voorraad weergeven
     for i, row in voorraad.iterrows():
         st.write(f"{row['Productnaam']}: {row['Actuele voorraad']} (Min {row['Minimum voorraad']})")
 
+    # --------------------------
+    # Voorraad bijvullen
+    # --------------------------
     st.subheader("Bijvullen")
-    prod = st.selectbox("Product", voorraad['Productnaam'], key="bijvullen_prod")
-    hoeveelheid = st.number_input("Aantal toevoegen", min_value=1, key="bijvullen_aantal")
+    prod_to_add = st.selectbox("Product", voorraad['Productnaam'], key="bijvullen_prod")
+    hoeveelheid_to_add = st.number_input("Aantal toevoegen", min_value=1, key="bijvullen_aantal")
     if st.button("Voorraad bijvullen", key="bijvullen_btn"):
-        update_voorraad(prod, hoeveelheid)
-        sheet_bijvulling.append_row([pd.Timestamp.now(tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),prod,hoeveelheid])
+        update_voorraad(prod_to_add, hoeveelheid_to_add)
+        sheet_bijvulling.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), prod_to_add, hoeveelheid_to_add])
         st.success("Voorraad bijgewerkt!")
+
+    # --------------------------
+    # Voorraad verwijderen
+    # --------------------------
+    st.subheader("Verwijderen uit voorraad")
+    prod_to_remove = st.selectbox("Product", voorraad['Productnaam'], key="verwijder_prod")
+    hoeveelheid_to_remove = st.number_input("Aantal verwijderen", min_value=1, max_value=int(voorraad.loc[voorraad['Productnaam']==prod_to_remove,'Actuele voorraad'].values[0]), key="verwijder_aantal")
+    if st.button("Voorraad verminderen", key="verwijder_btn"):
+        update_voorraad(prod_to_remove, -hoeveelheid_to_remove)
+        st.success("Voorraad verminderd!")
+
 
 # ------------------------------
 # TAB: Gezondheid toevoegen
@@ -267,3 +283,77 @@ with tabs[4]:
         sheet_baby.append_row([nieuwe_id,"Gezondheid",pd.Timestamp.now(tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M"),"",
                                "",gewicht,lengte,temperatuur,opmerkingen])
         st.success("Gezondheid toegevoegd!")
+
+# ------------------------------
+# TAB: Bewerk records
+# ------------------------------
+with tabs[6]:
+    st.title("✏️ Bewerk bestaand record")
+    record_type = st.selectbox("Kies type record", ["Slaap","Voeding","Luier","Gezondheid"])
+    df_type = baby_records[baby_records['Type']==record_type].sort_values("Starttijd", ascending=False)
+
+    if df_type.empty:
+        st.info("Geen records beschikbaar.")
+    else:
+        options = df_type['Starttijd'].dt.strftime("%Y-%m-%d %H:%M").tolist()
+        selected = st.selectbox(f"Selecteer {record_type} record", options)
+
+        if selected:
+            rij_index = df_type[df_type['Starttijd'].dt.strftime("%Y-%m-%d %H:%M")==selected].index[0]+2
+            record = df_type.loc[rij_index-2]
+
+            if record_type == "Slaap":
+                starttijd = st.time_input("Starttijd", record['Starttijd'].time())
+                duur = st.number_input("Duur (minuten)", value=int(record['Hoeveelheid']), min_value=1)
+                opmerking = st.text_input("Opmerking", record.get('Opmerking',''))
+
+                if st.button("Opslaan wijzigingen slaap"):
+                    start_dt = datetime.combine(datetime.today(), starttijd)
+                    sheet_baby.update_cell(rij_index,3,start_dt.strftime("%Y-%m-%d %H:%M"))
+                    sheet_baby.update_cell(rij_index,4,(start_dt+pd.Timedelta(minutes=duur)).strftime("%Y-%m-%d %H:%M"))
+                    sheet_baby.update_cell(rij_index,5,duur)
+                    sheet_baby.update_cell(rij_index,6,opmerking)
+                    st.success("Slaaprecord aangepast!")
+
+            elif record_type == "Voeding":
+                starttijd = st.time_input("Tijdstip", record['Starttijd'].time())
+                hoeveelheid = st.number_input("Hoeveelheid (ml)", value=int(record.get('Hoeveelheid',0)), min_value=0)
+                borst = st.text_input("Borst", record.get('Borst',''))
+                kolven = st.text_input("Kolven", record.get('Kolven',''))
+                verhouding = st.text_input("Verhouding", record.get('Verhouding',''))
+                opmerking = st.text_input("Opmerking", record.get('Opmerking',''))
+
+                if st.button("Opslaan wijzigingen voeding"):
+                    start_dt = datetime.combine(datetime.today(), starttijd)
+                    sheet_baby.update_cell(rij_index,3,start_dt.strftime("%Y-%m-%d %H:%M"))
+                    sheet_baby.update_cell(rij_index,5,hoeveelheid)
+                    sheet_baby.update_cell(rij_index,7,borst)
+                    sheet_baby.update_cell(rij_index,8,kolven)
+                    sheet_baby.update_cell(rij_index,9,verhouding)
+                    sheet_baby.update_cell(rij_index,6,opmerking)
+                    st.success("Voedingsrecord aangepast!")
+
+            elif record_type == "Luier":
+                starttijd = st.time_input("Tijdstip", record['Starttijd'].time())
+                type_luier = st.selectbox("Type luier", ["Plas","Poep","Beiden"], index=["Plas","Poep","Beiden"].index(record.get('Type Luier','Plas')))
+                opmerking = st.text_input("Opmerking", record.get('Opmerking',''))
+
+                if st.button("Opslaan wijzigingen luier"):
+                    start_dt = datetime.combine(datetime.today(), starttijd)
+                    sheet_baby.update_cell(rij_index,3,start_dt.strftime("%Y-%m-%d %H:%M"))
+                    sheet_baby.update_cell(rij_index,6,opmerking)
+                    sheet_baby.update_cell(rij_index,7,type_luier)
+                    st.success("Luierrecord aangepast!")
+
+            elif record_type == "Gezondheid":
+                gewicht = st.number_input("Gewicht (kg)", value=float(record.get('Gewicht',0.0)))
+                lengte = st.number_input("Lengte (cm)", value=float(record.get('Lengte',0.0)))
+                temperatuur = st.number_input("Temperatuur (°C)", value=float(record.get('Temperatuur',0.0)))
+                opmerkingen = st.text_area("Opmerkingen / ziekten", record.get('Opmerkingen / ziekten',''))
+
+                if st.button("Opslaan wijzigingen gezondheid"):
+                    sheet_baby.update_cell(rij_index,6,gewicht)
+                    sheet_baby.update_cell(rij_index,7,lengte)
+                    sheet_baby.update_cell(rij_index,8,temperatuur)
+                    sheet_baby.update_cell(rij_index,9,opmerkingen)
+                    st.success("Gezondheidsrecord aangepast!")

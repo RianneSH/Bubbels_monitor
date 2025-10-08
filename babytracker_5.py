@@ -173,7 +173,7 @@ with tabs[0]:
     st.write("Luiers")
     plot_weekly_graph("Luier")
 
-    st.subheader("📦 Voorraad (onderaan)")
+    st.subheader("📦 Voorraad")
     for i, row in voorraad.iterrows():
         voorraad_val = row["Actuele voorraad"]
         min_val = row["Minimum voorraad"]

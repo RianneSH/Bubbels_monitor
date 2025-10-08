@@ -6,14 +6,14 @@ import streamlit as st
 from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
 
-
+# ------------------------------
+# Streamlit page config
+# ------------------------------
 st.set_page_config(
     page_title="Bubbel",
-    page_icon="🫧",  # Bubble-emoji als tabbladicoon
+    page_icon="🫧",
     layout="wide"
 )
-
-
 
 # ------------------------------
 # Google Sheets verbinding
@@ -28,7 +28,7 @@ scopes = [
 creds = None
 client = None
 
-# Eerst proberen vanuit Streamlit Cloud Secret
+# Streamlit Cloud secret
 json_creds = os.environ.get("GCP_SERVICE_ACCOUNT")
 if json_creds:
     try:
@@ -38,7 +38,6 @@ if json_creds:
     except Exception as e:
         st.error(f"Kon de Google credentials niet laden: {e}")
 else:
-    # Fallback lokaal met credentials.json
     if os.path.exists("credentials.json"):
         try:
             creds = Credentials.from_service_account_file("credentials.json", scopes=scopes)
@@ -46,7 +45,7 @@ else:
         except Exception as e:
             st.error(f"Kon credentials.json niet laden: {e}")
     else:
-        st.warning("Geen Google credentials gevonden. Voeg service_account.json toe of gebruik Secrets in Streamlit Cloud.")
+        st.warning("Geen Google credentials gevonden.")
 
 sheet_baby = sheet_voorraad = sheet_bijvulling = None
 if client:
@@ -58,8 +57,9 @@ if client:
         st.error(f"Kan Google Sheets niet openen: {e}")
 
 # ------------------------------
-# Data ophalen
+# Data ophalen met caching
 # ------------------------------
+@st.cache_data(ttl=60)  # cache 60 seconden
 def load_data():
     baby_records = pd.DataFrame(sheet_baby.get_all_records()) if sheet_baby else pd.DataFrame()
     voorraad = pd.DataFrame(sheet_voorraad.get_all_records()) if sheet_voorraad else pd.DataFrame()
@@ -140,30 +140,44 @@ with tabs[0]:
     data = dashboard_data()
 
     st.subheader("💤 Laatste slaap")
-    slaap_df = data["Laatste slaap"]
-    if "Slaapkwaliteit" not in slaap_df.columns:
-        slaap_df["Slaapkwaliteit"] = ""
-    st.dataframe(slaap_df[["Starttijd","Eindtijd","Hoeveelheid","Opmerking","Slaapkwaliteit"]])
+    slaap_df = data.get("Laatste slaap", pd.DataFrame())
+    if not slaap_df.empty:
+        if "Slaapkwaliteit" not in slaap_df.columns:
+            slaap_df["Slaapkwaliteit"] = ""
+        if "Type slaap" not in slaap_df.columns:
+            slaap_df["Type slaap"] = ""
+        st.dataframe(slaap_df[["Starttijd","Eindtijd","Hoeveelheid","Opmerking","Type slaap","Slaapkwaliteit"]])
+    else:
+        st.info("Geen slaaprecords vandaag.")
 
     st.subheader("🍼 Laatste voeding")
-    voeding_df = data["Laatste voeding"]
+    voeding_df = data.get("Laatste voeding", pd.DataFrame())
     for col in ["Borst","Kolven","Verhouding"]:
         if col not in voeding_df.columns:
             voeding_df[col] = ""
-    st.dataframe(voeding_df[["Starttijd","Hoeveelheid","Borst","Kolven","Verhouding","Opmerking"]])
+    if not voeding_df.empty:
+        st.dataframe(voeding_df[["Starttijd","Hoeveelheid","Borst","Kolven","Verhouding","Opmerking"]])
+    else:
+        st.info("Geen voedingsrecords vandaag.")
 
     st.subheader("💩 Laatste luiers")
-    luier_df = data["Laatste luier"]
-    if "Type" not in luier_df.columns:
-        luier_df["Type"] = ""
-    st.dataframe(luier_df[["Starttijd","Type","Opmerking"]])
+    luier_df = data.get("Laatste luier", pd.DataFrame())
+    if not luier_df.empty:
+        if "Type" not in luier_df.columns:
+            luier_df["Type"] = ""
+        st.dataframe(luier_df[["Starttijd","Type","Opmerking"]])
+    else:
+        st.info("Geen luierreocrds vandaag.")
 
     st.subheader("🩺 Laatste gezondheid")
-    gezondheid_df = data["Laatste gezondheid"]
+    gezondheid_df = data.get("Laatste gezondheid", pd.DataFrame())
     for col in ["Gewicht","Lengte","Temperatuur","Opmerkingen / ziekten"]:
         if col not in gezondheid_df.columns:
             gezondheid_df[col] = ""
-    st.dataframe(gezondheid_df[["Starttijd","Gewicht","Lengte","Temperatuur","Opmerkingen / ziekten"]])
+    if not gezondheid_df.empty:
+        st.dataframe(gezondheid_df[["Starttijd","Gewicht","Lengte","Temperatuur","Opmerkingen / ziekten"]])
+    else:
+        st.info("Geen gezondheidsrecords vandaag.")
 
     st.subheader("📊 Grafieken laatste 7 dagen")
     st.write("Slaap (minuten)")
@@ -184,139 +198,3 @@ with tabs[0]:
         elif voorraad_val <= min_val + 2:
             kleur = "🟠"
         st.write(f"{kleur} {product}: {voorraad_val} (Min {min_val})")
-
-# ------------------------------
-# TAB: Slaap
-# ------------------------------
-with tabs[1]:
-    st.title("💤 Slaap toevoegen")
-    col1, col2 = st.columns(2)
-    with col1:
-        starttijd = st.time_input("Starttijd", datetime.now().time(), key="slaap_start")
-    with col2:
-        duur = st.number_input("Duur (minuten)", min_value=1, key="slaap_duur")
-        type_slaap = st.selectbox("Type slaap", ["Dutje", "Nacht"], key="slaap_type")
-        kwaliteit = st.selectbox("Slaapkwaliteit", ["Goed", "Onrustig", "Slecht"], key="slaap_kwaliteit")
-    opmerking = st.text_input("Opmerking", key="slaap_opmerking")
-    
-    if st.button("Opslaan slaap", key="slaap_btn"):
-        nieuwe_id = f"R{len(baby_records)+1:03}"
-        start_dt = datetime.combine(datetime.today(), starttijd)
-        sheet_baby.append_row([nieuwe_id,"Slaap",start_dt.strftime("%Y-%m-%d %H:%M"),
-                               (start_dt + pd.Timedelta(minutes=duur)).strftime("%Y-%m-%d %H:%M"),
-                               duur, opmerking, kwaliteit])
-        st.success("Slaapje toegevoegd!")
-
-# ------------------------------
-# TAB: Voeding
-# ------------------------------
-with tabs[2]:
-    st.title("🍼 Voeding toevoegen")
-    col1, col2 = st.columns(2)
-    with col1:
-        borst = st.selectbox("Borst/Fles", ["Links","Rechts","Beide","Fles"], key="voeding_borst")
-        ml = st.number_input("Hoeveelheid (ml)", min_value=1, key="voeding_ml")
-    with col2:
-        kolven = st.radio("Kolven?", ["Ja","Nee"], key="voeding_kolven")
-        tijdstip = st.time_input("Tijdstip", datetime.now().time(), key="voeding_tijd")
-    verhouding = st.text_input("Fles/borst verhouding", key="voeding_verhouding")
-    
-    if st.button("Opslaan voeding", key="voeding_btn"):
-        nieuwe_id = f"R{len(baby_records)+1:03}"
-        start_dt = datetime.combine(datetime.today(), tijdstip)
-        sheet_baby.append_row([nieuwe_id,"Voeding",start_dt.strftime("%Y-%m-%d %H:%M"),"",
-                               ml,"",borst,kolven,verhouding])
-        st.success("Voeding toegevoegd!")
-
-# ------------------------------
-# TAB: Luiers
-# ------------------------------
-with tabs[3]:
-    st.title("💩 Luier toevoegen")
-    col1, col2 = st.columns(2)
-    with col1:
-        tijdstip = st.time_input("Tijdstip", datetime.now().time(), key="luier_tijd")
-    with col2:
-        type_luier = st.selectbox("Type luier", ["Plas","Poep","Beiden"], key="luier_type")
-    opmerking = st.text_input("Opmerking", key="luier_opmerking")
-    
-    if st.button("Opslaan luier", key="luier_btn"):
-        nieuwe_id = f"R{len(baby_records)+1:03}"
-        start_dt = datetime.combine(datetime.today(), tijdstip)
-        sheet_baby.append_row([nieuwe_id,"Luier",start_dt.strftime("%Y-%m-%d %H:%M"),"",1,opmerking,type_luier])
-        update_voorraad("Luiers",-1)
-        st.success("Luier toegevoegd en voorraad bijgewerkt!")
-
-# ------------------------------
-# TAB: Voorraad
-# ------------------------------
-with tabs[5]:
-    st.title("📦 Voorraad beheren")
-    for i, row in voorraad.iterrows():
-        st.write(f"{row['Productnaam']}: {row['Actuele voorraad']} (Min {row['Minimum voorraad']})")
-    
-    st.subheader("Bijvullen")
-    prod = st.selectbox("Product", voorraad['Productnaam'], key="bijvullen_prod")
-    hoeveelheid = st.number_input("Aantal toevoegen", min_value=1, key="bijvullen_aantal")
-    if st.button("Voorraad bijvullen", key="bijvullen_btn"):
-        update_voorraad(prod, hoeveelheid)
-        sheet_bijvulling.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"),prod,hoeveelheid])
-        st.success("Voorraad bijgewerkt!")
-
-# ------------------------------
-# TAB: Gezondheid
-# ------------------------------
-with tabs[4]:
-    st.title("🩺 Gezondheid toevoegen")
-    col1, col2 = st.columns(2)
-    with col1:
-        gewicht = st.number_input("Gewicht (kg)", min_value=0.0, step=0.1, key="gez_gewicht")
-        lengte = st.number_input("Lengte (cm)", min_value=0.0, step=0.1, key="gez_lengte")
-    with col2:
-        temperatuur = st.number_input("Temperatuur (°C)", min_value=30.0, max_value=45.0, step=0.1, key="gez_temp")
-    opmerkingen = st.text_area("Opmerkingen / ziekten", key="gez_opmerkingen")
-    
-    if st.button("Opslaan gezondheid", key="gez_btn"):
-        nieuwe_id = f"R{len(baby_records)+1:03}"
-        sheet_baby.append_row([nieuwe_id,"Gezondheid",datetime.now().strftime("%Y-%m-%d %H:%M"),"",
-                               "",gewicht,lengte,temperatuur,opmerkingen])
-        st.success("Gezondheid toegevoegd!")
-
-# ------------------------------
-# TAB: Bewerk records
-# ------------------------------
-with tabs[6]:
-    st.title("✏️ Bewerk bestaand record")
-    record_type = st.selectbox("Kies type record", ["Slaap","Voeding","Luier","Gezondheid"])
-    df_type = baby_records[baby_records['Type']==record_type].sort_values("Starttijd", ascending=False)
-    
-    if df_type.empty:
-        st.info("Geen records beschikbaar.")
-    else:
-        options = df_type['Starttijd'].dt.strftime("%Y-%m-%d %H:%M").tolist()
-        selected = st.selectbox(f"Selecteer {record_type} record", options)
-
-        if selected:
-            rij_index = df_type[df_type['Starttijd'].dt.strftime("%Y-%m-%d %H:%M")==selected].index[0]+2
-            record = df_type.loc[rij_index-2]
-
-            # --------------------------
-            # Slaap record
-            # --------------------------
-            if record_type=="Slaap":
-                starttijd = st.time_input("Starttijd", record['Starttijd'].time())
-                duur = st.number_input("Duur (minuten)", value=int(record['Hoeveelheid']), min_value=1)
-                type_slaap = st.selectbox("Type slaap", ["Dutje","Nacht"], index=["Dutje","Nacht"].index(record.get('Type','Dutje')))
-                kwaliteit = st.selectbox("Slaapkwaliteit", ["Goed","Onrustig","Slecht"], index=["Goed","Onrustig","Slecht"].index(record.get('Slaapkwaliteit','Goed')))
-                opmerking = st.text_input("Opmerking", record.get('Opmerking',''))
-
-                if st.button("Opslaan wijzigingen"):
-                    start_dt = datetime.combine(datetime.today(), starttijd)
-                    sheet_baby.update_cell(rij_index,3,start_dt.strftime("%Y-%m-%d %H:%M"))
-                    sheet_baby.update_cell(rij_index,4,(start_dt+pd.Timedelta(minutes=duur)).strftime("%Y-%m-%d %H:%M"))
-                    sheet_baby.update_cell(rij_index,5,duur)
-                    sheet_baby.update_cell(rij_index,6,opmerking)
-                    sheet_baby.update_cell(rij_index,7,kwaliteit)
-                    st.success("Slaaprecord aangepast!")
-
-

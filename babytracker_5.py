@@ -130,7 +130,7 @@ def plot_weekly_graph(type_event):
 # ------------------------------
 # Tabs
 # ------------------------------
-tabs = st.tabs(["Dashboard", "Slaap", "Voeding", "Luiers", "Voorraad", "Gezondheid", "Bewerk records"])
+tabs = st.tabs(["Dashboard", "Slaap", "Voeding", "Luiers", "Gezondheid", "Voorraad", "Bewerk records"])
 
 # ------------------------------
 # TAB: Dashboard

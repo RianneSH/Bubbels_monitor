@@ -184,7 +184,8 @@ st.session_state.selected_tab = selected_tab
 if selected_tab == "Dashboard":
     st.title("Bubbels monitor")
     st.subheader("Overzicht laatste records van vandaag")
-
+    
+ 
     # Huidige datum
     vandaag = pd.Timestamp(datetime.now().date())
 
@@ -328,7 +329,7 @@ if selected_tab == "Voeding":
 
     elif voeding_type == 'Kolven':
         borst = st.selectbox('Borst', ['Links', 'Rechts', 'Beide'], key='voeding_borst')
-        kolven = st.number_input('Hoeveelheid (ml)', min_value=10, value=0, key='voeding_kolven')
+        kolven = st.number_input('Hoeveelheid (ml)', min_value=0, value=10, key='voeding_kolven')
         opm = st.text_input('Opmerking', key='voeding_opm')
 
     if st.button("Opslaan voeding", key='voeding_opslaan'):

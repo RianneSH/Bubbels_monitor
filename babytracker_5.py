@@ -182,7 +182,7 @@ st.session_state.selected_tab = selected_tab
 # TAB: Dashboard
 # ------------------------------
 if selected_tab == "Dashboard":
-    st.title("Bubbels monitor🫧")
+    st.title("Bubbels monitor🫧)
     st.subheader("Overzicht laatste records van vandaag")
 
     # Huidige datum

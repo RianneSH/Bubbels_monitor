@@ -7,29 +7,78 @@ from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
 import altair as alt
 from streamlit_option_menu import option_menu
+from streamlit_extras.stylable_container import stylable_container
 
 st.set_page_config(page_title="Bubbel", page_icon="🫧", layout="wide")
 LOCAL_TZ = 'Europe/Amsterdam'
 
-# -----------------------------
-# MODUSKEUZE / HOME BUTTON
-# -----------------------------
+# -------------------
+# HOME / MODUS
+# -------------------
+
+import streamlit as st
+from streamlit_extras.stylable_container import stylable_container
 
 if "mode" not in st.session_state:
     st.session_state.mode = None
 
 if st.session_state.mode is None:
-    st.title("Kies een modus")
+    st.markdown("<h1 style='text-align: center;'>🫧 Bubbel</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: gray;'>Kies een modus om te starten</p>", unsafe_allow_html=True)
+    st.write("")
 
     col1, col2 = st.columns(2)
+
+    # -------------------
+    # Babytracker kaart
+    # -------------------
     with col1:
-        if st.button("🕒 Babytracker", key="btn_tracker"):
-            st.session_state.mode = "Tracker"
-            st.rerun()
+        with stylable_container(
+            key="tracker_card",
+            css_styles="""
+                {
+                    border: 3px solid #14532d;
+                    border-radius: 20px;
+                    padding: 40px 20px;
+                    background-color: white;
+                    text-align: center;
+                    box-shadow: 0px 4px 10px rgba(0,0,0,0.05);
+                }
+            """
+        ):
+            st.markdown("<div style='font-size: 50px; margin-bottom: 10px;'>🚼</div>", unsafe_allow_html=True)
+            st.markdown("<h3>Babytracker</h3>", unsafe_allow_html=True)
+            st.markdown("<p style='color: gray;'>Volg slaap, voeding en andere statistieken voor je baby</p>", unsafe_allow_html=True)
+
+            if st.button("Start Babytracker", key="btn_tracker"):
+                st.session_state.mode = "Tracker"
+                st.rerun()
+
+    # -------------------
+    # To-do kaart
+    # -------------------
     with col2:
-        if st.button("📝 To do", key="btn_organiseren"):
-            st.session_state.mode = "Organiseren"
-            st.rerun()
+        with stylable_container(
+            key="todo_card",
+            css_styles="""
+                {
+                    border: 3px solid #7f1d1d;
+                    border-radius: 20px;
+                    padding: 40px 20px;
+                    background-color: white;
+                    text-align: center;
+                    box-shadow: 0px 4px 10px rgba(0,0,0,0.05);
+                }
+            """
+        ):
+            st.markdown("<div style='font-size: 50px; margin-bottom: 10px;'>✅</div>", unsafe_allow_html=True)
+            st.markdown("<h3>To-do</h3>", unsafe_allow_html=True)
+            st.markdown("<p style='color: gray;'>Beheer al je taken en to-do items als (aankomend) ouder</p>", unsafe_allow_html=True)
+
+            if st.button("Start To-do", key="btn_organiseren"):
+                st.session_state.mode = "Organiseren"
+                st.rerun()
+
 
 # ------------------------------
 # Google Sheets setup
@@ -302,7 +351,7 @@ if st.session_state.mode == "Organiseren":
     gefilterde_taken = [(i, t) for i, t in categories[selected_category] if taak_filter(t["Status"])]
 
     if not gefilterde_taken:
-        st.info("Geen taken die aan dit filter voldoen.")
+        st.info(" Geen taken die aan dit filter voldoen.")
     else:
         for row_index, task in gefilterde_taken:
             task_name = task['Taak']

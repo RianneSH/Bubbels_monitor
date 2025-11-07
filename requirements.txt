@@ -7,3 +7,4 @@ gspread
 google-auth
 altair
 streamlit-option-menu
+streamlit-extras

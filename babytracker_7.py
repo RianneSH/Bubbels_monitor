@@ -7,16 +7,15 @@ from datetime import datetime, timedelta
 from google.oauth2.service_account import Credentials
 import altair as alt
 from streamlit_option_menu import option_menu
+from zoneinfo import ZoneInfo
 import time
-import pytz
 
 # ------------------------------
 # Config
 # ------------------------------
 st.set_page_config(page_title="Bubbel", page_icon="🫧", layout="wide")
 # Tijdzone instellen
-LOCAL_TZ = pytz.timezone('Europe/Amsterdam')
-
+LOCAL_TZ = ZoneInfo("Europe/Amsterdam")
 
 # ------------------------------
 # Google Sheets setup
@@ -58,10 +57,14 @@ if client:
         st.error(f"Kan Google Sheets niet openen: {e}")
 
 # ------------------------------
-# Helpers: load data with robust tz handling
+# Helpers
 # ------------------------------
 def get_current_time():
     return datetime.now(LOCAL_TZ)
+
+def make_datetime(dt_date, dt_time):
+    combined = datetime.combine(dt_date, dt_time)
+    return combined.replace(tzinfo=LOCAL_TZ)
 
 @st.cache_data(ttl=60, show_spinner=False)
 def load_data():
@@ -246,7 +249,7 @@ if selected_tab == "Dashboard":
     st.subheader("Overzicht laatste records van vandaag")
  
     # Huidige datum
-    vandaag = pd.Timestamp(get_current_time()).normalize()
+    vandaag = get_current_time().date()
 
     # Maak vier kolommen voor metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -348,18 +351,15 @@ if selected_tab == "Dashboard":
         st.subheader("🩺 Gezondheid")
         st.info("Geen gegevens beschikbaar")
 
-
-
 # ------------------------------
 # TAB: Slaap
 # ------------------------------
 if selected_tab == "Slaap":
     st.title("💤 Slaap toevoegen")
-    st.subheader("Slaap toevoegen")
     start_manual = st.time_input("Starttijd", datetime.now().time(), key='s_start')
     duur_manual = st.number_input("Duur (min)", min_value=0, value=60, key='s_duur')
     opm_manual = st.text_input("Opmerking", key='s_opm_manual')
-    if st.button("Opslaan", key='s_opslaan'):
+    if st.button("💾 Opslaan", key='s_opslaan'):
         start_dt = make_datetime(datetime.today(), start_manual).strftime('%Y-%m-%d %H:%M')
         eind_dt = (make_datetime(datetime.today(), start_manual) + timedelta(minutes=duur_manual)).strftime('%Y-%m-%d %H:%M')
         add_record(
@@ -444,7 +444,7 @@ if selected_tab == "Luiers":
     typ = st.selectbox('Type luier', ['Nat', 'Vuil'], key='l_type')
     opm = st.text_input("Opmerking", key='l_opm')
     
-    if st.button("Opslaan luier", key='l_opslaan'):
+    if st.button("💾 Opslaan", key='l_opslaan'):
         start_dt = make_datetime(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
         
         success = add_record(
@@ -483,7 +483,7 @@ if selected_tab == "Gezondheid":
     temp = st.number_input('Temperatuur (°C)', min_value=30.0, max_value=45.0, step=0.1, value=36.5, key='g_temp')
     opm = st.text_area('Opmerkingen / ziekten', key='g_opm')
 
-    if st.button("Opslaan gezondheid", key='g_opslaan'):
+    if st.button("💾 Opslaan", key='g_opslaan'):
         start_dt = get_current_time().strftime('%Y-%m-%d %H:%M')
 
         # Zorg dat komma's correct worden verwerkt

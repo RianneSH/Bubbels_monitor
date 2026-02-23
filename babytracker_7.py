@@ -246,7 +246,7 @@ if selected_tab == "Dashboard":
     st.subheader("Overzicht laatste records van vandaag")
  
     # Huidige datum
-    vandaag = pd.Timestamp(get_current_time.date())
+    vandaag = pd.Timestamp(get_current_time()).normalize()
 
     # Maak vier kolommen voor metrics
     col1, col2, col3, col4 = st.columns(4)

@@ -258,7 +258,7 @@ if selected_tab == "Dashboard":
     # Slaap - aantal en laatste tijd vandaag
     # ------------------------------
     slaap_df = baby_records[(baby_records['Type'] == 'Slaap') & 
-                            (baby_records['Starttijd'].dt.date == vandaag.date())]
+                            (baby_records['Starttijd'].dt.date == vandaag)]
     if not slaap_df.empty:
         aantal_slaap = len(slaap_df)
         laatste_slaap = slaap_df.sort_values('Starttijd', ascending=False).iloc[0]['Starttijd'].strftime('%H:%M')
@@ -271,7 +271,7 @@ if selected_tab == "Dashboard":
     # ------------------------------
     voeding_df = baby_records[
         (baby_records['Type'] == 'Voeding') &
-        (baby_records['Starttijd'].dt.date == vandaag.date()) &
+        (baby_records['Starttijd'].dt.date == vandaag) &
         (baby_records['Voeding_type'].isin(['Borst', 'Fles']))
     ]
 
@@ -290,7 +290,7 @@ if selected_tab == "Dashboard":
     # Luiers - aantal en laatste tijd vandaag (compact)
     # ------------------------------
     luier_df = baby_records[(baby_records['Type'] == 'Luier') & 
-                            (baby_records['Starttijd'].dt.date == vandaag.date())]
+                            (baby_records['Starttijd'].dt.date == vandaag)]
 
     if not luier_df.empty:
         # Aantal luiers per type

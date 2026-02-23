@@ -305,7 +305,7 @@ if selected_tab == "Dashboard":
             "Nat: 0 (Laatste: –)  \n"
             "Vuil: 0 (Laatste: –)"
         )
-
+        
     # ------------------------------
     # Gezondheid - laatste record (onafhankelijk van datum)
     # ------------------------------
@@ -465,42 +465,42 @@ if selected_tab == "Luiers":
         if success:
             update_voorraad("Luiers", -1)
 
- # ------------------------------
-    # TAB: Gezondheid
-    # ------------------------------
-    if selected_tab == "Gezondheid":
-        st.title("🩺 Gezondheid toevoegen")
+# ------------------------------
+# TAB: Gezondheid
+# ------------------------------
+if selected_tab == "Gezondheid":
+    st.title("🩺 Gezondheid toevoegen")
 
-        # Standaardwaarden en invoer
-        gewicht = st.number_input('Gewicht (kg)', min_value=0.0, step=0.1, value=5.0, key='g_gewicht')
-        lengte = st.number_input('Lengte (cm)', min_value=30.0, step=0.1, value=50.0, key='g_lengte')
-        temp = st.number_input('Temperatuur (°C)', min_value=30.0, max_value=45.0, step=0.1, value=36.5, key='g_temp')
-        opm = st.text_area('Opmerkingen / ziekten', key='g_opm')
+    # Standaardwaarden en invoer
+    gewicht = st.number_input('Gewicht (gram)', min_value=0.0, step=0.1, value=5.0, key='g_gewicht')
+    lengte = st.number_input('Lengte (cm)', min_value=30.0, step=0.1, value=50.0, key='g_lengte')
+    temp = st.number_input('Temperatuur (°C)', min_value=30.0, max_value=45.0, step=0.1, value=36.5, key='g_temp')
+    opm = st.text_area('Opmerkingen / ziekten', key='g_opm')
 
-        if st.button("Opslaan gezondheid", key='g_opslaan'):
-            start_dt = datetime.now().strftime('%Y-%m-%d %H:%M')
+    if st.button("Opslaan gezondheid", key='g_opslaan'):
+        start_dt = datetime.now().strftime('%Y-%m-%d %H:%M')
 
-            # Zorg dat komma's correct worden verwerkt
-            gewicht = float(str(gewicht).replace(',', '.'))
-            lengte = float(str(lengte).replace(',', '.'))
-            temp = float(str(temp).replace(',', '.'))
+        # Zorg dat komma's correct worden verwerkt
+        gewicht = float(str(gewicht).replace(',', '.'))
+        lengte = float(str(lengte).replace(',', '.'))
+        temp = float(str(temp).replace(',', '.'))
 
-            add_record(
-                "Gezondheid",
-                [
-                    start_dt,   # Starttijd
-                    '',         # Eindtijd
-                    '',         # Hoeveelheid
-                    '',         # Opmerking
-                    '', '', '', '',  # Type Luier, Borst, Kolven, Fles
-                    '',          # Voeding_type
-                    gewicht, # Gewicht 
-                    lengte,  # Lengte 
-                    temp,    # Temperatuur
-                    opm          # Opmerkingen / ziekten
-                ],
-                rerun=False
-            )
+        add_record(
+            "Gezondheid",
+            [
+                start_dt,   # Starttijd
+                '',         # Eindtijd
+                '',         # Hoeveelheid
+                '',         # Opmerking
+                '', '', '', '',  # Type Luier, Borst, Kolven, Fles
+                '',          # Voeding_type
+                gewicht, # Gewicht 
+                lengte,  # Lengte 
+                temp,    # Temperatuur
+                opm          # Opmerkingen / ziekten
+            ],
+            rerun=False
+        )
 # ------------------------------
 # TAB: Voorraad
 # ------------------------------

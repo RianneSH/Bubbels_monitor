@@ -209,6 +209,44 @@ if selected_tab == "Dashboard":
     else:
         col3.markdown("**🧷 Luiers vandaag**\n\nNat: 0  \nVuil: 0")
 
+    # ------------------------------
+    # Gezondheid - laatste record (onafhankelijk van datum)
+    # ------------------------------
+    gez_df = baby_records[baby_records['Type'] == 'Gezondheid']
+    if not gez_df.empty:
+        laatste_gez = gez_df.sort_values('Starttijd', ascending=False).iloc[0]
+        tijd = laatste_gez['Starttijd'].strftime('%H:%M')
+
+        # Converteer waarden naar float, vervang komma door punt
+        try:
+            gewicht = float(str(laatste_gez.get('Gewicht', 0)).replace(',', '.'))
+        except:
+            gewicht = 0.0
+        try:
+            lengte = float(str(laatste_gez.get('Lengte', 0)).replace(',', '.'))
+        except:
+            lengte = 0.0
+        try:
+            temp = float(str(laatste_gez.get('Temperatuur', 0)).replace(',', '.'))
+        except:
+            temp = 0.0
+
+        opmerkingen = laatste_gez.get('Opmerkingen / ziekten', 'Geen')
+
+        st.subheader("🩺 Laatste gezondheid record")
+        st.markdown(f"""
+        **Tijdstip:** {tijd}  
+        **Gewicht:** {gewicht:.1f} kg  
+        **Lengte:** {lengte:.1f} cm  
+        **Temperatuur:** {temp:.1f} °C  
+        **Opmerkingen:** {opmerkingen if opmerkingen else 'Geen'}
+        """)
+    else:
+        st.subheader("🩺 Gezondheid")
+        st.info("Geen gegevens beschikbaar")
+
+
+
 # ------------------------------
 # TAB: Slaap
 # ------------------------------

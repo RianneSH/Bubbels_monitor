@@ -252,7 +252,7 @@ if selected_tab == "Dashboard":
 # ------------------------------
 if selected_tab == "Slaap":
     st.title("💤 Slaap toevoegen")
-    start_time = st.time_input("Starttijd", now_device().time())
+    start_time = st.time_input("Starttijd")
     duration = st.number_input("Duur (minuten)", min_value=0, value=60)
     opm = st.text_input("Opmerking")
     if st.button("💾 Opslaan"):
@@ -268,7 +268,7 @@ if selected_tab == "Slaap":
 # ------------------------------
 if selected_tab == "Voeding":
     st.title("🍼 Voeding toevoegen")
-    tijdstip = st.time_input("Tijdstip", now_device().time())
+    tijdstip = st.time_input("Tijdstip")
     hoeveelheid = st.number_input("Hoeveelheid (ml)", min_value=0, value=100)
     voeding_type = st.selectbox("Type voeding", ["Borst","Fles","Kolven","Hapje"])
     opm = st.text_input("Opmerking")
@@ -284,7 +284,7 @@ if selected_tab == "Voeding":
 # ------------------------------
 if selected_tab == "Luiers":
     st.title("💧 Luiers toevoegen")
-    tijdstip = st.time_input("Tijdstip", now_device().time())
+    tijdstip = st.time_input("Tijdstip")
     typ = st.selectbox("Type luier", ["Nat","Vuil"])
     opm = st.text_input("Opmerking")
     if st.button("💾 Opslaan"):

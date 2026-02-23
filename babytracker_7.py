@@ -8,12 +8,14 @@ from google.oauth2.service_account import Credentials
 import altair as alt
 from streamlit_option_menu import option_menu
 import time
+import pytz
 
 # ------------------------------
 # Config
 # ------------------------------
 st.set_page_config(page_title="Bubbel", page_icon="🫧", layout="wide")
-LOCAL_TZ = 'Europe/Amsterdam'
+# Tijdzone instellen
+LOCAL_TZ = pytz.timezone('Europe/Amsterdam')
 
 
 # ------------------------------
@@ -56,37 +58,11 @@ if client:
         st.error(f"Kan Google Sheets niet openen: {e}")
 
 # ------------------------------
-# Timer-functionaliteit
-# ------------------------------
-if 'active_session' not in st.session_state:
-    st.session_state.active_session = None  # {'type': 'Voeding'/'Slaap', 'start_time': datetime}
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_cached_session():
-    """Ophalen van tijdelijk opgeslagen actieve sessie (werkt binnen zelfde device/browser)"""
-    return st.session_state.active_session
-
-def start_session(sessietype):
-    if st.session_state.active_session:
-        st.warning("Er loopt al een sessie! Stop die eerst voordat je een nieuwe start.")
-        return
-    st.session_state.active_session = {'type': sessietype, 'start_time': datetime.now()}
-    st.toast(f"⏱️ {sessietype} gestart om {st.session_state.active_session['start_time'].strftime('%H:%M')}")
-
-def stop_session():
-    sessie = st.session_state.active_session
-    if not sessie:
-        st.warning("Er is geen actieve sessie om te stoppen.")
-        return
-    duur_min = (datetime.now() - sessie['start_time']).total_seconds() / 60
-    st.toast(f"🛑 {sessie['type']} gestopt na {duur_min:.1f} minuten.")
-    st.session_state.active_session = None
-    return duur_min
-
-
-# ------------------------------
 # Helpers: load data with robust tz handling
 # ------------------------------
+def get_current_time():
+    return datetime.now(LOCAL_TZ)
+
 @st.cache_data(ttl=60, show_spinner=False)
 def load_data():
     baby_records = pd.DataFrame(sheet_baby.get_all_records()) if sheet_baby else pd.DataFrame()
@@ -130,6 +106,36 @@ def load_data():
 # Data laden
 baby_records, voorraad, bijvullingen = load_data()
 
+# ------------------------------
+# Opslaan functie met timezone
+# ------------------------------
+def make_datetime(dt_date, dt_time):
+    """Combineer date + time en lokaliseer in LOCAL_TZ"""
+    combined = datetime.combine(dt_date, dt_time)
+    return LOCAL_TZ.localize(combined)
+
+# ------------------------------
+# Timer-functionaliteit
+# ------------------------------
+if 'active_session' not in st.session_state:
+    st.session_state.active_session = None
+
+def start_session(sessietype):
+    if st.session_state.active_session:
+        st.warning("Er loopt al een sessie! Stop die eerst.")
+        return
+    st.session_state.active_session = {'type': sessietype, 'start_time': get_current_time()}
+    st.toast(f"⏱️ {sessietype} gestart om {st.session_state.active_session['start_time'].strftime('%H:%M')}")
+
+def stop_session():
+    sessie = st.session_state.active_session
+    if not sessie:
+        st.warning("Geen actieve sessie.")
+        return
+    duur_min = (get_current_time() - sessie['start_time']).total_seconds() / 60
+    st.toast(f"🛑 {sessie['type']} gestopt na {duur_min:.1f} minuten.")
+    st.session_state.active_session = None
+    return duur_min
 
 # ------------------------------
 # Voorraad helpers
@@ -240,7 +246,7 @@ if selected_tab == "Dashboard":
     st.subheader("Overzicht laatste records van vandaag")
  
     # Huidige datum
-    vandaag = pd.Timestamp(datetime.now().date())
+    vandaag = pd.Timestamp(get_current_time.date())
 
     # Maak vier kolommen voor metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -354,8 +360,8 @@ if selected_tab == "Slaap":
     duur_manual = st.number_input("Duur (min)", min_value=0, value=60, key='s_duur')
     opm_manual = st.text_input("Opmerking", key='s_opm_manual')
     if st.button("Opslaan", key='s_opslaan'):
-        start_dt = datetime.combine(datetime.today(), start_manual).strftime('%Y-%m-%d %H:%M')
-        eind_dt = (datetime.combine(datetime.today(), start_manual) + timedelta(minutes=duur_manual)).strftime('%Y-%m-%d %H:%M')
+        start_dt = make_datetime(datetime.today(), start_manual).strftime('%Y-%m-%d %H:%M')
+        eind_dt = (make_datetime(datetime.today(), start_manual) + timedelta(minutes=duur_manual)).strftime('%Y-%m-%d %H:%M')
         add_record(
                 "Slaap",
                 [
@@ -409,7 +415,7 @@ if selected_tab == "Voeding":
 
     # Opslaan
     if st.button("💾 Opslaan", key='voeding_opslaan_manual'):
-        start_dt = datetime.combine(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
+        start_dt = make_datetime(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
         add_record(
             'Voeding',
             [
@@ -439,7 +445,7 @@ if selected_tab == "Luiers":
     opm = st.text_input("Opmerking", key='l_opm')
     
     if st.button("Opslaan luier", key='l_opslaan'):
-        start_dt = datetime.combine(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
+        start_dt = make_datetime(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
         
         success = add_record(
             "Luier",
@@ -472,13 +478,13 @@ if selected_tab == "Gezondheid":
     st.title("🩺 Gezondheid toevoegen")
 
     # Standaardwaarden en invoer
-    gewicht = st.number_input('Gewicht (gram)', min_value=0.0, step=0.1, value=5.0, key='g_gewicht')
+    gewicht = st.number_input('Gewicht (kilo)', min_value=0.0, step=0.1, value=5.0, key='g_gewicht')
     lengte = st.number_input('Lengte (cm)', min_value=30.0, step=0.1, value=50.0, key='g_lengte')
     temp = st.number_input('Temperatuur (°C)', min_value=30.0, max_value=45.0, step=0.1, value=36.5, key='g_temp')
     opm = st.text_area('Opmerkingen / ziekten', key='g_opm')
 
     if st.button("Opslaan gezondheid", key='g_opslaan'):
-        start_dt = datetime.now().strftime('%Y-%m-%d %H:%M')
+        start_dt = get_current_time().strftime('%Y-%m-%d %H:%M')
 
         # Zorg dat komma's correct worden verwerkt
         gewicht = float(str(gewicht).replace(',', '.'))
@@ -573,7 +579,7 @@ if selected_tab == "Bewerk records":
                 duur = st.number_input('Duur (min)', int(record.get('Hoeveelheid',0)), key='e_s_duur')
                 opm = st.text_input('Opmerking', record.get('Opmerking',''), key='e_s_opm')
                 if st.button('Opslaan wijziging slaap', key='e_s_save'):
-                    start_dt = datetime.combine(datetime.today(), start).strftime('%Y-%m-%d %H:%M')
+                    start_dt = make_datetime(datetime.today(), start).strftime('%Y-%m-%d %H:%M')
                     edit_record(sheet_row, {3: start_dt, 4: (datetime.combine(datetime.today(), start) + timedelta(minutes=duur)).strftime('%Y-%m-%d %H:%M'), 5: duur, 6: opm})
             elif record_type == 'Voeding':
                 start = st.time_input('Tijdstip', record['Starttijd'].time(), key='e_v_start')
@@ -583,14 +589,14 @@ if selected_tab == "Bewerk records":
                 fles = st.text_input('Fles', record.get('Fles',''), key='e_v_fles')
                 opm = st.text_input('Opmerking', record.get('Opmerking',''), key='e_v_opm')
                 if st.button('Opslaan wijziging voeding', key='e_v_save'):
-                    start_dt = datetime.combine(datetime.today(), start).strftime('%Y-%m-%d %H:%M')
+                    start_dt = make_datetime(datetime.today(), start).strftime('%Y-%m-%d %H:%M')
                     edit_record(sheet_row, {3: start_dt, 5: hoeveelheid, 7: borst, 8: kolven, 9: fles, 6: opm})
             elif record_type == 'Luier':
                 start = st.time_input('Tijdstip', record['Starttijd'].time(), key='e_l_start')
                 typ = st.selectbox('Type luier', ['Plas','Poep','Beiden'], index=['Plas','Poep','Beiden'].index(record.get('Type Luier','Plas')), key='e_l_type')
                 opm = st.text_input('Opmerking', record.get('Opmerking',''), key='e_l_opm')
                 if st.button('Opslaan wijziging luier', key='e_l_save'):
-                    start_dt = datetime.combine(datetime.today(), start).strftime('%Y-%m-%d %H:%M')
+                    start_dt = make_datetime(datetime.today(), start).strftime('%Y-%m-%d %H:%M')
                     edit_record(sheet_row, {3: start_dt, 6: opm, 7: typ})
             elif record_type == 'Gezondheid':
                 gewicht = st.number_input('Gewicht (kg)', float(record.get('Gewicht',0.0)), key='e_g_gewicht')

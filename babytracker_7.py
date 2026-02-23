@@ -63,9 +63,10 @@ def get_current_time():
     return datetime.now(LOCAL_TZ)
 
 def make_datetime(dt_date, dt_time):
+    """Combineer date + time en lokaliseer correct in LOCAL_TZ (Europe/Amsterdam)"""
     combined = datetime.combine(dt_date, dt_time)
     if combined.tzinfo is None:
-        combined = combined.replace(tzinfo=LOCAL_TZ)  # correct lokaliseer
+        combined = combined.replace(tzinfo=LOCAL_TZ)
     else:
         combined = combined.astimezone(LOCAL_TZ)
     return combined
@@ -364,8 +365,12 @@ if selected_tab == "Slaap":
     duur_manual = st.number_input("Duur (min)", min_value=0, value=60, key='s_duur')
     opm_manual = st.text_input("Opmerking", key='s_opm_manual')
     if st.button("💾 Opslaan", key='s_opslaan'):
-        start_dt = make_datetime(datetime.today(), start_manual).strftime('%Y-%m-%d %H:%M')
-        eind_dt = (make_datetime(datetime.today(), start_manual) + timedelta(minutes=duur_manual)).strftime('%Y-%m-%d %H:%M')
+        # combineer tijd van input met server datum en lokaliseer
+        start_dt_obj = make_datetime(get_current_time().date(), start_manual)
+        eind_dt_obj = start_dt_obj + timedelta(minutes=duur_manual)
+
+        start_dt = start_dt_obj.strftime('%Y-%m-%d %H:%M')
+        eind_dt = eind_dt_obj.strftime('%Y-%m-%d %H:%M')
         add_record(
                 "Slaap",
                 [
@@ -419,7 +424,8 @@ if selected_tab == "Voeding":
 
     # Opslaan
     if st.button("💾 Opslaan", key='voeding_opslaan_manual'):
-        start_dt = make_datetime(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
+        start_dt_obj = make_datetime(get_current_time().date(), tijdstip)
+        start_dt = start_dt_obj.strftime('%Y-%m-%d %H:%M')
         add_record(
             'Voeding',
             [
@@ -449,7 +455,8 @@ if selected_tab == "Luiers":
     opm = st.text_input("Opmerking", key='l_opm')
     
     if st.button("💾 Opslaan", key='l_opslaan'):
-        start_dt = make_datetime(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
+        start_dt_obj = make_datetime(get_current_time().date(), tijdstip)
+        start_dt = start_dt_obj.strftime('%Y-%m-%d %H:%M')
         
         success = add_record(
             "Luier",

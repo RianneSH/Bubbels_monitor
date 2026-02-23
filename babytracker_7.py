@@ -81,12 +81,13 @@ baby_records, voorraad, bijvullingen = load_data()
 # ------------------------------
 # Centrale device tijd functie
 # ------------------------------
-def get_device_datetime(time_input: time, date_input: date = None) -> datetime:
+
+def get_device_datetime(time_input: time, date_input: date = None):
     if date_input is None:
-        date_input = datetime.now().date()
+        date_input = date.today()  # GEEN datetime.now() meer!
     return datetime.combine(date_input, time_input)
 
-def now_device() -> datetime:
+def now_device():
     return datetime.now()
 
 # ------------------------------

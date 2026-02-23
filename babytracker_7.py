@@ -64,7 +64,11 @@ def get_current_time():
 
 def make_datetime(dt_date, dt_time):
     combined = datetime.combine(dt_date, dt_time)
-    return combined.replace(tzinfo=LOCAL_TZ)
+    if combined.tzinfo is None:
+        combined = combined.replace(tzinfo=LOCAL_TZ)  # correct lokaliseer
+    else:
+        combined = combined.astimezone(LOCAL_TZ)
+    return combined
 
 @st.cache_data(ttl=60, show_spinner=False)
 def load_data():
@@ -80,9 +84,9 @@ def load_data():
             return pd.NaT
         try:
             if ts.tzinfo is None:
-                ts = ts.tz_localize(LOCAL_TZ)
+                ts = ts.replace(tzinfo=LOCAL_TZ)
             else:
-                ts = ts.tz_convert(LOCAL_TZ)
+                ts = ts.astimezone(LOCAL_TZ)
         except Exception:
             ts = ts.tz_localize(LOCAL_TZ)
         return ts

@@ -264,21 +264,55 @@ if selected_tab == "Slaap":
         )
 
 # ------------------------------
-# TAB: Voeding
+# TAB: Voeding 
 # ------------------------------
 if selected_tab == "Voeding":
     st.title("🍼 Voeding toevoegen")
-    tijdstip = st.time_input("Tijdstip")
-    hoeveelheid = st.number_input("Hoeveelheid (ml)", min_value=0, value=100)
-    voeding_type = st.selectbox("Type voeding", ["Borst","Fles","Kolven","Hapje"])
-    opm = st.text_input("Opmerking")
-    if st.button("💾 Opslaan voeding"):
-        start_dt = get_device_datetime(tijdstip)
-        add_record(
-            "Voeding",
-            [start_dt.strftime("%Y-%m-%d %H:%M"), '', hoeveelheid, opm, '', '', '', '', voeding_type, '', '', '', '']
-        )
 
+# ------------------------------
+# Invoer (Fles / Kolven / Borstvoeding / Hapje)
+# ------------------------------
+
+voeding_type = st.selectbox(
+    "Type voeding", 
+    ['Borst', 'Fles', 'Kolven', 'Hapje'], 
+    index=1,
+    key='voeding_type_manual'
+)
+tijdstip = st.time_input('Tijdstip', datetime.now().time(), key='voeding_tijd_manual')
+
+borst = kolven = fles = hapje_type = ''
+hoeveelheid = 0
+
+match voeding_type:
+    case 'Borst':
+        borst = st.selectbox('Borst', ['Links', 'Rechts', 'Beide'], key='voeding_borst_manual')
+    case 'Fles':
+        fles = st.selectbox('Type fles', ['melk', 'kunstvoeding'], index=1, key='voeding_fles_manual')
+        hoeveelheid = st.number_input('Hoeveelheid (ml)', min_value=0, value=100, key='voeding_hoeveelheid_fles')
+    case 'Kolven':
+        borst = st.selectbox('Borst', ['Links', 'Rechts', 'Beide'], key='voeding_borst_kolven')
+        kolven = st.number_input('Hoeveelheid (ml)', min_value=0, value=10, key='voeding_kolven_manual')
+    case 'Hapje':
+        hapje_type = st.selectbox('Type hapje', ['groente', 'fruit', 'snack'], key='voeding_hapje_type')
+        hoeveelheid = st.number_input('Hoeveelheid (gram)', min_value=0, value=50, key='voeding_hoeveelheid_hapje')
+
+opm = st.text_input('Opmerking', key=f'voeding_opm_{voeding_type.lower()}')
+
+if st.button("💾 Opslaan", key='voeding_opslaan_manual'):
+    start_dt = make_datetime(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
+    add_record(
+        'Voeding',
+        [
+            start_dt, '',
+            hoeveelheid if voeding_type != 'Kolven' else '',
+            opm, '',
+            borst, kolven, fles, voeding_type, hapje_type,
+            '', '', '',
+        ],
+        rerun=False
+    )
+    st.success("Voeding opgeslagen ✅")
 # ------------------------------
 # TAB: Luiers
 # ------------------------------
@@ -334,7 +368,7 @@ if selected_tab == "Bewerk records":
             # --- Afhankelijk van type renderen ---
             if record_type == 'Slaap':
                 start = st.time_input('Starttijd', record['Starttijd'].time())
-                duur = st.number_input('Duur (min)', int(record.get('Hoeveelheid',0)))
+                duur = st.number_input('Duur (min)', value=int(record.get('Hoeveelheid', 0)), min_value=0)
                 opm = st.text_input('Opmerking', record.get('Opmerking',''))
                 if st.button('Opslaan wijziging slaap'):
                     start_dt = get_device_datetime(start)
@@ -348,7 +382,7 @@ if selected_tab == "Bewerk records":
 
             elif record_type == 'Voeding':
                 start = st.time_input('Tijdstip', record['Starttijd'].time())
-                hoeveelheid = st.number_input('Hoeveelheid', int(record.get('Hoeveelheid',0)))
+                hoeveelheid = st.number_input('Hoeveelheid', value=int(record.get('Hoeveelheid', 0)), min_value=0)
                 opm = st.text_input('Opmerking', record.get('Opmerking',''))
                 if st.button('Opslaan wijziging voeding'):
                     start_dt = get_device_datetime(start)
@@ -371,9 +405,9 @@ if selected_tab == "Bewerk records":
                     })
 
             elif record_type == 'Gezondheid':
-                gewicht = st.number_input('Gewicht (kg)', float(record.get('Gewicht',0.0)))
-                lengte = st.number_input('Lengte (cm)', float(record.get('Lengte',0.0)))
-                temp = st.number_input('Temperatuur (°C)', float(record.get('Temperatuur',0.0)))
+                gewicht = st.number_input('Gewicht (kg)', value=float(record.get('Gewicht', 0.0)), min_value=0.0)
+                lengte = st.number_input('Lengte (cm)', value=float(record.get('Lengte', 0.0)), min_value=0.0)
+                temp = st.number_input('Temperatuur (°C)', value=float(record.get('Temperatuur', 0.0)), min_value=0.0)
                 opm = st.text_area('Opmerkingen / ziekten', record.get('Opmerkingen / ziekten',''))
                 if st.button('Opslaan wijziging gezondheid'):
                     edit_record(sheet_row, {

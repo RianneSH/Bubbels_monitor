@@ -388,30 +388,123 @@ if selected_tab == "Bewerk records":
 # ------------------------------
 if selected_tab == "Analyse":
     st.title("📊 Analyse trends")
+    
     if baby_records.empty:
         st.info("Geen gegevens beschikbaar voor analyse.")
     else:
-        # Dagelijkse voeding
-        voeding_df = baby_records[baby_records['Type']=="Voeding"].copy()
+        # ------------------------------
+        # Voedingstrends
+        # ------------------------------
+        voeding_df = baby_records[baby_records['Type'] == 'Voeding'].copy()
         if not voeding_df.empty:
             voeding_df['Datum'] = voeding_df['Starttijd'].dt.date
-            daily_voeding = voeding_df.groupby('Datum')['Hoeveelheid'].sum().reset_index()
-            chart = alt.Chart(daily_voeding).mark_bar(color='lightblue').encode(
-                x='Datum:T', y='Hoeveelheid:Q', tooltip=['Datum','Hoeveelheid']
-            ).properties(height=250)
-            st.altair_chart(chart, use_container_width=True)
+            voeding_plot_df = voeding_df[voeding_df['Voeding_type'].isin(['Borst','Fles'])]
 
-        # Dagelijkse slaap
-        slaap_df = baby_records[baby_records['Type']=="Slaap"].copy()
+            # Dagelijkse totale voeding
+            daily_voeding = voeding_plot_df.groupby('Datum')['Hoeveelheid'].sum().reset_index()
+            with st.expander("🍼 Dagelijkse voeding (ml)"):
+                chart = alt.Chart(daily_voeding).mark_bar(color='lightblue').encode(
+                    x='Datum:T',
+                    y='Hoeveelheid:Q',
+                    tooltip=['Datum', 'Hoeveelheid']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
+
+            # Gemiddelde voeding per dagdeel
+            def get_daypart(hour):
+                if 6 <= hour < 12:
+                    return 'Ochtend'
+                elif 12 <= hour < 18:
+                    return 'Middag'
+                elif 18 <= hour < 24:
+                    return 'Avond'
+                else:
+                    return 'Nacht'
+            
+            voeding_plot_df['Dagdeel'] = voeding_plot_df['Starttijd'].dt.hour.apply(get_daypart)
+            avg_voeding = voeding_plot_df.groupby('Dagdeel')['Hoeveelheid'].mean().reset_index()
+            with st.expander("🕓 Gemiddelde voeding per dagdeel"):
+                chart = alt.Chart(avg_voeding).mark_bar(color='lightgreen').encode(
+                    x='Dagdeel:N',
+                    y='Hoeveelheid:Q',
+                    tooltip=['Dagdeel', 'Hoeveelheid']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("Geen voeding gegevens beschikbaar.")
+
+        # ------------------------------
+        # Slaaptrends
+        # ------------------------------
+        slaap_df = baby_records[baby_records['Type'] == 'Slaap'].copy()
         if not slaap_df.empty:
             slaap_df['Datum'] = slaap_df['Starttijd'].dt.date
             slaap_df['Eindtijd'] = pd.to_datetime(slaap_df['Eindtijd'], errors='coerce')
-            slaap_df['Duur_min'] = ((slaap_df['Eindtijd']-slaap_df['Starttijd']).dt.total_seconds()/60).fillna(0)
-            daily_slaap = slaap_df.groupby('Datum')['Duur_min'].sum().reset_index()
-            chart = alt.Chart(daily_slaap).mark_line(point=True, color='orange').encode(
-                x='Datum:T', y='Duur_min:Q', tooltip=['Datum','Duur_min']
-            ).properties(height=250)
-            st.altair_chart(chart, use_container_width=True)
+            slaap_df['Duur_min'] = ((slaap_df['Eindtijd'] - slaap_df['Starttijd']).dt.total_seconds() / 60).fillna(0)
+
+            # Aantal slaapjes per dag
+            daily_slaap = slaap_df.groupby('Datum').size().reset_index(name='Aantal slaapjes')
+            with st.expander("💤 Aantal slaapjes per dag"):
+                chart = alt.Chart(daily_slaap).mark_line(point=True, color='orange').encode(
+                    x='Datum:T',
+                    y='Aantal slaapjes:Q',
+                    tooltip=['Datum', 'Aantal slaapjes']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
+
+            # Totale slaapduur per dag
+            daily_slaapduur = slaap_df.groupby('Datum')['Duur_min'].sum().reset_index()
+            with st.expander("⏱️ Totale slaapduur per dag (minuten)"):
+                chart = alt.Chart(daily_slaapduur).mark_line(point=True, color='purple').encode(
+                    x='Datum:T',
+                    y='Duur_min:Q',
+                    tooltip=['Datum', 'Duur_min']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("Geen slaapgegevens beschikbaar.")
+
+        # ------------------------------
+        # Gewichtstrends
+        # ------------------------------
+        gewicht_df = baby_records[baby_records['Type'] == 'Gezondheid'].copy()
+        if not gewicht_df.empty:
+            gewicht_df['Datum'] = gewicht_df['Starttijd'].dt.date
+            with st.expander("⚖️ Gewichtontwikkeling"):
+                chart = alt.Chart(gewicht_df).mark_line(point=True, color='green').encode(
+                    x='Datum:T',
+                    y='Gewicht:Q',
+                    tooltip=['Datum', 'Gewicht']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("Geen gewicht gegevens beschikbaar.")
+
+        # ------------------------------
+        # Overige trends of afwijkingen (optioneel)
+        # ------------------------------
+        luier_df = baby_records[baby_records['Type'] == 'Luier'].copy()  # <--- toevoegen
+
+        with st.expander("📈 Afwijkingen / ratio's"):
+            # Borst vs flesvoeding
+            if not voeding_df.empty:
+                borst_count = len(voeding_df[voeding_df['Voeding_type']=='Borst'])
+                fles_count = len(voeding_df[voeding_df['Voeding_type']=='Fles'])
+                totaal = borst_count + fles_count
+                st.write(f"Percentage borstvoeding: {borst_count/totaal*100:.1f}%")
+                st.write(f"Percentage flesvoeding: {fles_count/totaal*100:.1f}%")
+            else:
+                st.write("Geen voeding gegevens beschikbaar voor ratio's.")
+
+            # Nat vs vuil luiers
+            if not luier_df.empty:
+                nat = len(luier_df[luier_df['Type Luier']=='Nat'])
+                vuil = len(luier_df[luier_df['Type Luier']=='Vuil'])
+                totaal_luiers = nat + vuil
+                st.write(f"Percentage natte luiers: {nat/totaal_luiers*100:.1f}%")
+                st.write(f"Percentage vuile luiers: {vuil/totaal_luiers*100:.1f}%")
+            else:
+                st.write("Geen luiergegevens beschikbaar voor ratio's.")
 
 # ------------------------------
 # TAB: Data

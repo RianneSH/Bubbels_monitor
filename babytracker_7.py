@@ -266,41 +266,40 @@ if selected_tab == "Slaap":
 # ------------------------------
 # TAB: Voeding 
 # ------------------------------
-    if selected_tab == "Voeding":
-        st.title("🍼 Voeding toevoegen")
+if selected_tab == "Voeding":
+    st.title("🍼 Voeding toevoegen")
 
 # ------------------------------
 # Invoer (Fles / Kolven / Borstvoeding / Hapje)
 # ------------------------------
+    voeding_type = st.selectbox(
+        "Type voeding", 
+        ['Borst', 'Fles', 'Kolven', 'Hapje'], 
+        index=1,
+        key='voeding_type_manual'
+    )
+    tijdstip = st.time_input('Tijdstip', datetime.now().time(), key='voeding_tijd_manual')
 
-        voeding_type = st.selectbox(
-            "Type voeding", 
-            ['Borst', 'Fles', 'Kolven', 'Hapje'], 
-            index=1,
-            key='voeding_type_manual'
-        )
-        tijdstip = st.time_input('Tijdstip', datetime.now().time(), key='voeding_tijd_manual')
+    borst = kolven = fles = hapje_type = ''
+    hoeveelheid = 0
 
-        borst = kolven = fles = hapje_type = ''
-        hoeveelheid = 0
+    match voeding_type:
+        case 'Borst':
+            borst = st.selectbox('Borst', ['Links', 'Rechts', 'Beide'], key='voeding_borst_manual')
+        case 'Fles':
+            fles = st.selectbox('Type fles', ['melk', 'kunstvoeding'], index=1, key='voeding_fles_manual')
+            hoeveelheid = st.number_input('Hoeveelheid (ml)', min_value=0, value=100, key='voeding_hoeveelheid_fles')
+        case 'Kolven':
+            borst = st.selectbox('Borst', ['Links', 'Rechts', 'Beide'], key='voeding_borst_kolven')
+            kolven = st.number_input('Hoeveelheid (ml)', min_value=0, value=10, key='voeding_kolven_manual')
+        case 'Hapje':
+            hapje_type = st.selectbox('Type hapje', ['groente', 'fruit', 'snack'], key='voeding_hapje_type')
+            hoeveelheid = st.number_input('Hoeveelheid (gram)', min_value=0, value=50, key='voeding_hoeveelheid_hapje')
 
-        match voeding_type:
-            case 'Borst':
-                borst = st.selectbox('Borst', ['Links', 'Rechts', 'Beide'], key='voeding_borst_manual')
-            case 'Fles':
-                fles = st.selectbox('Type fles', ['melk', 'kunstvoeding'], index=1, key='voeding_fles_manual')
-                hoeveelheid = st.number_input('Hoeveelheid (ml)', min_value=0, value=100, key='voeding_hoeveelheid_fles')
-            case 'Kolven':
-                borst = st.selectbox('Borst', ['Links', 'Rechts', 'Beide'], key='voeding_borst_kolven')
-                kolven = st.number_input('Hoeveelheid (ml)', min_value=0, value=10, key='voeding_kolven_manual')
-            case 'Hapje':
-                hapje_type = st.selectbox('Type hapje', ['groente', 'fruit', 'snack'], key='voeding_hapje_type')
-                hoeveelheid = st.number_input('Hoeveelheid (gram)', min_value=0, value=50, key='voeding_hoeveelheid_hapje')
+    opm = st.text_input('Opmerking', key=f'voeding_opm_{voeding_type.lower()}')
 
-        opm = st.text_input('Opmerking', key=f'voeding_opm_{voeding_type.lower()}')
-
-        if st.button("💾 Opslaan", key='voeding_opslaan_manual'):
-            start_dt = datetime.combine(datetime.today(), tijdstip).strftime('%Y-%m-%d %H:%M')
+    if st.button("💾 Opslaan", key='voeding_opslaan_manual'):
+            start_dt = get_device_datetime(tijdstip).strftime('%Y-%m-%d %H:%M')
             add_record(
                 'Voeding',
                 [

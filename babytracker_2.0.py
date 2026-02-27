@@ -428,7 +428,7 @@ if selected_tab == "Gezondheid":
 # TAB: Activiteiten
 # ------------------------------
 if selected_tab == "Activiteiten":
-    st.title("🎈 Activiteiten toevoegen")
+    st.title("🎈 Activiteit toevoegen")
 
     ACTIVITEITEN = [
         ("🐛", "Tummy time"),

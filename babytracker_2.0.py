@@ -227,8 +227,18 @@ if "selected_tab" not in st.session_state:
 
 with st.sidebar:
     st.markdown("""
+    <style>
+    @media (prefers-color-scheme: dark) {
+        .bubbel-wordmark { color: #ffffff !important; }
+        .bubbel-subtitle { color: #aaaaaa !important; }
+    }
+    @media (prefers-color-scheme: light) {
+        .bubbel-wordmark { color: #1a1a1a !important; }
+        .bubbel-subtitle { color: #888888 !important; }
+    }
+    </style>
     <div style="padding: 24px 8px 16px 8px;">
-        <span style="font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a;">Bubbel</span><span style="font-size: 28px; font-weight: 700; color: #7a9e72;">.</span>
+        <span class="bubbel-wordmark" style="font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Bubbel</span><span style="font-size: 28px; font-weight: 700; color: #7a9e72;">.</span>
     </div>
     """, unsafe_allow_html=True)
     selected_from_menu = option_menu(
@@ -252,8 +262,8 @@ if selected_tab == "Dashboard":
     baby_naam = inst.get('baby_naam', 'Bubbel')
     st.markdown(f"""
     <div style="padding: 8px 0 24px 0;">
-        <div><span style="font-size: 36px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a;">Bubbel</span><span style="font-size: 36px; font-weight: 700; color: #7a9e72;">.</span></div>
-        <div style="font-size: 16px; color: #888; margin-top: 4px;">Dagoverzicht van {baby_naam}</div>
+        <div><span class="bubbel-wordmark" style="font-size: 36px; font-weight: 700; letter-spacing: -0.5px;">Bubbel</span><span style="font-size: 36px; font-weight: 700; color: #7a9e72;">.</span></div>
+        <div class="bubbel-subtitle" style="font-size: 16px; margin-top: 4px;">Dagoverzicht van {baby_naam}</div>
     </div>
     """, unsafe_allow_html=True)
     vandaag = date.today()
@@ -283,9 +293,10 @@ if selected_tab == "Dashboard":
     if not luier_df.empty:
         nat_count = len(luier_df[luier_df['Type Luier'] == 'Nat'])
         vuil_count = len(luier_df[luier_df['Type Luier'] == 'Vuil'])
-        col3.markdown(f"**🧷 Luiers vandaag**\n\nNat: {nat_count}  \nVuil: {vuil_count}")
+        laatste_luier = luier_df.sort_values('Starttijd', ascending=False).iloc[0]['Starttijd'].strftime('%H:%M')
+        col3.metric("🧷 Luiers vandaag", f"Nat: {nat_count}  Vuil: {vuil_count}", delta=f"Laatste: {laatste_luier}")
     else:
-        col3.markdown("**🧷 Luiers vandaag**\n\nNat: 0  \nVuil: 0")
+        col3.metric("🧷 Luiers vandaag", "Nat: 0  Vuil: 0")
 
     if not activiteiten.empty:
         act_vandaag = activiteiten[activiteiten['Starttijd'].dt.date == vandaag]
@@ -317,17 +328,17 @@ if selected_tab == "Dashboard":
         except:
             temp = 0.0
         opmerkingen = laatste_gez.get('Opmerkingen / ziekten', 'Geen')
-        st.subheader("🩺 Laatste gezondheid record")
-        st.markdown(f"""
-        **Tijdstip:** {tijd}  
-        **Gewicht:** {gewicht:.1f} kg  
-        **Lengte:** {lengte:.1f} cm  
-        **Temperatuur:** {temp:.1f} °C  
-        **Opmerkingen:** {opmerkingen if opmerkingen else 'Geen'}
-        """)
+        with st.expander("🩺 Laatste gezondheid record"):
+            st.markdown(f"""
+            **Tijdstip:** {tijd}  
+            **Gewicht:** {gewicht:.1f} kg  
+            **Lengte:** {lengte:.1f} cm  
+            **Temperatuur:** {temp:.1f} °C  
+            **Opmerkingen:** {opmerkingen if opmerkingen else 'Geen'}
+            """)
     else:
-        st.subheader("🩺 Gezondheid")
-        st.info("Geen gegevens beschikbaar")
+        with st.expander("🩺 Laatste gezondheid record"):
+            st.info("Geen gegevens beschikbaar")
 
 # ------------------------------
 # TAB: Slaap
@@ -514,52 +525,96 @@ if selected_tab == "Voorraad":
 if selected_tab == "Bewerk records":
     st.title('✏️ Bewerk bestaand record')
 
-    record_type = st.selectbox('Kies type record', ['Slaap', 'Voeding', 'Luier', 'Gezondheid'])
-    df_type = baby_records[baby_records['Type'] == record_type].sort_values('Starttijd', ascending=False)
+    record_type = st.selectbox('Kies type record', ['Slaap', 'Voeding', 'Luier', 'Gezondheid', 'Activiteit'])
 
-    if df_type.empty:
-        st.info('Geen records beschikbaar')
+    if record_type == 'Activiteit':
+        if activiteiten.empty:
+            st.info('Geen activiteiten beschikbaar')
+        else:
+            act_options = activiteiten.sort_values('Starttijd', ascending=False)['Starttijd'].dt.strftime('%Y-%m-%d %H:%M').tolist()
+            selected = st.selectbox('Selecteer activiteit', act_options)
+            if selected:
+                idx = activiteiten[activiteiten['Starttijd'].dt.strftime('%Y-%m-%d %H:%M') == selected].index[0]
+                sheet_row = idx + 2
+                record = activiteiten.loc[idx]
+                st.write(record)
+
+                ACTIVITEITEN_NAMEN = ["Tummy time", "Bad", "Douchen", "Wandelen", "Zwemmen", "Familie/vrienden", "CJG/Dokter", "Speelmat", "Draagdoek"]
+                REACTIE_LABELS = ["Boos", "Huilerig", "Neutraal", "Blij", "Heel blij"]
+
+                act_idx = ACTIVITEITEN_NAMEN.index(record.get('Activiteit_type', 'Tummy time')) if record.get('Activiteit_type') in ACTIVITEITEN_NAMEN else 0
+                activiteit_type = st.selectbox('Activiteit', ACTIVITEITEN_NAMEN, index=act_idx)
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    tijdstip = st.time_input('Tijdstip', record['Starttijd'].time())
+                with col2:
+                    duur = st.number_input('Duur (minuten)', min_value=0, value=int(record.get('Duur', 15)))
+
+                reactie_idx = REACTIE_LABELS.index(record.get('Reactie', 'Blij')) if record.get('Reactie') in REACTIE_LABELS else 3
+                reactie = st.selectbox('Reactie', REACTIE_LABELS, index=reactie_idx)
+                opm = st.text_input('Opmerking', record.get('Opmerking', ''))
+
+                if st.button('Opslaan wijziging activiteit'):
+                    start_dt = get_device_datetime(tijdstip, record['Starttijd'].date())
+                    end_dt = start_dt + timedelta(minutes=duur)
+                    if sheet_activiteiten:
+                        try:
+                            sheet_activiteiten.update_cell(sheet_row, 2, start_dt.strftime('%Y-%m-%d %H:%M'))
+                            sheet_activiteiten.update_cell(sheet_row, 3, end_dt.strftime('%Y-%m-%d %H:%M'))
+                            sheet_activiteiten.update_cell(sheet_row, 4, duur)
+                            sheet_activiteiten.update_cell(sheet_row, 5, activiteit_type)
+                            sheet_activiteiten.update_cell(sheet_row, 6, reactie)
+                            sheet_activiteiten.update_cell(sheet_row, 7, opm)
+                            st.success('Activiteit aangepast ✅')
+                        except Exception as e:
+                            st.error(f"Kon niet updaten: {e}")
     else:
-        options = df_type['Starttijd'].dt.strftime('%Y-%m-%d %H:%M').tolist()
-        selected = st.selectbox('Selecteer record', options)
-        if selected:
-            idx = df_type[df_type['Starttijd'].dt.strftime('%Y-%m-%d %H:%M') == selected].index[0]
-            sheet_row = idx + 2
-            record = df_type.loc[idx]
-            st.write(record)
+        df_type = baby_records[baby_records['Type'] == record_type].sort_values('Starttijd', ascending=False)
 
-            if record_type == 'Slaap':
-                start = st.time_input('Starttijd', record['Starttijd'].time())
-                duur = st.number_input('Duur (min)', value=int(record.get('Hoeveelheid', 0)), min_value=0)
-                opm = st.text_input('Opmerking', record.get('Opmerking', ''))
-                if st.button('Opslaan wijziging slaap'):
-                    start_dt = get_device_datetime(start)
-                    eind_dt = start_dt + timedelta(minutes=duur)
-                    edit_record(sheet_row, {3: start_dt.strftime('%Y-%m-%d %H:%M'), 4: eind_dt.strftime('%Y-%m-%d %H:%M'), 5: duur, 6: opm})
+        if df_type.empty:
+            st.info('Geen records beschikbaar')
+        else:
+            options = df_type['Starttijd'].dt.strftime('%Y-%m-%d %H:%M').tolist()
+            selected = st.selectbox('Selecteer record', options)
+            if selected:
+                idx = df_type[df_type['Starttijd'].dt.strftime('%Y-%m-%d %H:%M') == selected].index[0]
+                sheet_row = idx + 2
+                record = df_type.loc[idx]
+                st.write(record)
 
-            elif record_type == 'Voeding':
-                start = st.time_input('Tijdstip', record['Starttijd'].time())
-                hoeveelheid = st.number_input('Hoeveelheid', value=int(record.get('Hoeveelheid', 0)), min_value=0)
-                opm = st.text_input('Opmerking', record.get('Opmerking', ''))
-                if st.button('Opslaan wijziging voeding'):
-                    start_dt = get_device_datetime(start)
-                    edit_record(sheet_row, {3: start_dt.strftime('%Y-%m-%d %H:%M'), 5: hoeveelheid, 6: opm})
+                if record_type == 'Slaap':
+                    start = st.time_input('Starttijd', record['Starttijd'].time())
+                    duur = st.number_input('Duur (min)', value=int(record.get('Hoeveelheid', 0)), min_value=0)
+                    opm = st.text_input('Opmerking', record.get('Opmerking', ''))
+                    if st.button('Opslaan wijziging slaap'):
+                        start_dt = get_device_datetime(start)
+                        eind_dt = start_dt + timedelta(minutes=duur)
+                        edit_record(sheet_row, {3: start_dt.strftime('%Y-%m-%d %H:%M'), 4: eind_dt.strftime('%Y-%m-%d %H:%M'), 5: duur, 6: opm})
 
-            elif record_type == 'Luier':
-                start = st.time_input('Tijdstip', record['Starttijd'].time())
-                typ = st.selectbox('Type luier', ['Nat', 'Vuil'], index=['Nat', 'Vuil'].index(record.get('Type Luier', 'Nat')))
-                opm = st.text_input('Opmerking', record.get('Opmerking', ''))
-                if st.button('Opslaan wijziging luier'):
-                    start_dt = get_device_datetime(start)
-                    edit_record(sheet_row, {3: start_dt.strftime('%Y-%m-%d %H:%M'), 6: opm, 7: typ})
+                elif record_type == 'Voeding':
+                    start = st.time_input('Tijdstip', record['Starttijd'].time())
+                    hoeveelheid = st.number_input('Hoeveelheid', value=int(record.get('Hoeveelheid', 0)), min_value=0)
+                    opm = st.text_input('Opmerking', record.get('Opmerking', ''))
+                    if st.button('Opslaan wijziging voeding'):
+                        start_dt = get_device_datetime(start)
+                        edit_record(sheet_row, {3: start_dt.strftime('%Y-%m-%d %H:%M'), 5: hoeveelheid, 6: opm})
 
-            elif record_type == 'Gezondheid':
-                gewicht = st.number_input('Gewicht (kg)', value=float(record.get('Gewicht', 0.0)), min_value=0.0)
-                lengte = st.number_input('Lengte (cm)', value=float(record.get('Lengte', 0.0)), min_value=0.0)
-                temp = st.number_input('Temperatuur (°C)', value=float(record.get('Temperatuur', 0.0)), min_value=0.0)
-                opm = st.text_area('Opmerkingen / ziekten', record.get('Opmerkingen / ziekten', ''))
-                if st.button('Opslaan wijziging gezondheid'):
-                    edit_record(sheet_row, {11: gewicht, 12: lengte, 13: temp, 14: opm})
+                elif record_type == 'Luier':
+                    start = st.time_input('Tijdstip', record['Starttijd'].time())
+                    typ = st.selectbox('Type luier', ['Nat', 'Vuil'], index=['Nat', 'Vuil'].index(record.get('Type Luier', 'Nat')))
+                    opm = st.text_input('Opmerking', record.get('Opmerking', ''))
+                    if st.button('Opslaan wijziging luier'):
+                        start_dt = get_device_datetime(start)
+                        edit_record(sheet_row, {3: start_dt.strftime('%Y-%m-%d %H:%M'), 6: opm, 7: typ})
+
+                elif record_type == 'Gezondheid':
+                    gewicht = st.number_input('Gewicht (kg)', value=float(record.get('Gewicht', 0.0)), min_value=0.0)
+                    lengte = st.number_input('Lengte (cm)', value=float(record.get('Lengte', 0.0)), min_value=0.0)
+                    temp = st.number_input('Temperatuur (°C)', value=float(record.get('Temperatuur', 0.0)), min_value=0.0)
+                    opm = st.text_area('Opmerkingen / ziekten', record.get('Opmerkingen / ziekten', ''))
+                    if st.button('Opslaan wijziging gezondheid'):
+                        edit_record(sheet_row, {11: gewicht, 12: lengte, 13: temp, 14: opm})
 
 # ------------------------------
 # TAB: Analyse

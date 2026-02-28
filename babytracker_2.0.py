@@ -576,6 +576,63 @@ if selected_tab == "Voorraad":
                 st.error(f"Kon bijvulling niet loggen: {e}")
 
     st.markdown("""
+    <style>
+    .voorraad-kaart {
+        background: var(--vk-bg, #ffffff);
+        border-color: var(--vk-border, #efefef) !important;
+    }
+    .voorraad-kaart .kaart-naam    { color: var(--vk-tekst, #1a1a1a) !important; }
+    .voorraad-kaart .kaart-getal   { color: var(--vk-tekst, #1a1a1a) !important; }
+    .voorraad-kaart .kaart-subtekst { color: var(--vk-sub, #888888) !important; }
+    .voorraad-kaart .kaart-stat    { background: var(--vk-stat-bg, #f8f8f8) !important; }
+    .voorraad-kaart .kaart-stat-label  { color: var(--vk-sub, #888888) !important; }
+    .voorraad-kaart .kaart-stat-getal  { color: var(--vk-tekst, #1a1a1a) !important; }
+    .voorraad-kaart .kaart-stat-eenheid { color: var(--vk-sub, #888888) !important; }
+    </style>
+    <script>
+    (function() {
+        function applyTheme() {
+            // Streamlit zet --background-color op de root
+            var bg = getComputedStyle(document.documentElement)
+                        .getPropertyValue('--background-color').trim();
+            var isDark = false;
+            if (bg) {
+                // Zet hex naar RGB en check luminantie
+                var hex = bg.replace('#','');
+                if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
+                var r = parseInt(hex.substr(0,2),16);
+                var g = parseInt(hex.substr(2,2),16);
+                var b = parseInt(hex.substr(4,2),16);
+                var lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+                isDark = lum < 0.5;
+            }
+            var root = document.documentElement;
+            if (isDark) {
+                root.style.setProperty('--vk-bg',       '#1e1e1e');
+                root.style.setProperty('--vk-border',   '#333333');
+                root.style.setProperty('--vk-tekst',    '#f0f0f0');
+                root.style.setProperty('--vk-sub',      '#888888');
+                root.style.setProperty('--vk-stat-bg',  '#2a2a2a');
+            } else {
+                root.style.setProperty('--vk-bg',       '#ffffff');
+                root.style.setProperty('--vk-border',   '#efefef');
+                root.style.setProperty('--vk-tekst',    '#1a1a1a');
+                root.style.setProperty('--vk-sub',      '#888888');
+                root.style.setProperty('--vk-stat-bg',  '#f8f8f8');
+            }
+        }
+        applyTheme();
+        // Herdetecteer bij themawijziging
+        var observer = new MutationObserver(applyTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        // Fallback: check elke seconde de eerste 5 seconden
+        var checks = 0;
+        var interval = setInterval(function() {
+            applyTheme();
+            if (++checks >= 5) clearInterval(interval);
+        }, 1000);
+    })();
+    </script>
     <div style="margin-bottom:4px;">
         <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;">📦 Voorraad</span>
     </div>
@@ -633,17 +690,7 @@ if selected_tab == "Voorraad":
                 status_bg, status_color, status_label = "#f0fdf4", "#166534", "Voldoende"
                 card_border, dagen_bg, dagen_color, bar_color = "#efefef", "#f0fdf4", "#166534", "#7a9e72"
 
-            # Progressbar — max is de hoogste bekende voorraad (uit bijvulhistorie) of een zinvolle vaste waarde
-            if naam == "Kunstvoeding":
-                # Grootste pak = 2100g (3 pakken), of gebruik actueel*1.2 als dat hoger is
-                max_val = max(2100, actueel)
-            elif naam == "Luiers":
-                # Grootste pak = 108 stuks, of gebruik actueel*1.2 als dat hoger is
-                max_val = max(108, actueel)
-            else:
-                max_val = max(actueel * 1.5, minimum * 2, 1)
-            pct = min(100, actueel / max_val * 100) if max_val > 0 else 0
-            min_pct = min(100, minimum / max_val * 100) if max_val > 0 else 0
+            # Geen progressbar meer nodig
 
             # Mini staafgrafiek SVG
             bar_max = max(history) if history and max(history) > 0 else 1
@@ -659,7 +706,7 @@ if selected_tab == "Voorraad":
                 bars_svg += f'<rect x="{x}" y="{svg_h - h}" width="{bar_w}" height="{h}" rx="2" fill="{fill}"/>'
 
             icon = "🧷" if naam == "Luiers" else "🍼"
-            variant_html = f'<div style="font-size:11px;color:#999;margin-top:1px;">{variant}</div>' if variant else ''
+            variant_html = f'<div class="kaart-subtekst" style="font-size:11px;margin-top:1px;">{variant}</div>' if variant else ''
             per_dag_html = f'{per_dag}' if per_dag is not None else '–'
             dagen_html = f'±{dagen_resterend} <span style="font-weight:400;font-size:11px;">dagen</span>' if dagen_resterend is not None else '–'
 
@@ -672,41 +719,34 @@ if selected_tab == "Voorraad":
                 snelkeuze_opties = []
 
             kaart_cols[i].markdown(f"""
-<div style="background:#ffffff;border:1.5px solid {card_border};border-radius:20px;padding:20px 20px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.04);">
+<div class="voorraad-kaart" style="border:1.5px solid {card_border};border-radius:20px;padding:20px 20px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.04);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <div style="display:flex;align-items:center;gap:8px;">
       <span style="font-size:22px;line-height:1;">{icon}</span>
       <div>
-        <div style="font-weight:800;font-size:14px;line-height:1.2;color:#1a1a1a;">{naam}</div>
+        <div class="kaart-naam" style="font-weight:800;font-size:14px;line-height:1.2;">{naam}</div>
         {variant_html}
       </div>
     </div>
     <span style="background:{status_bg};color:{status_color};font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;letter-spacing:0.3px;text-transform:uppercase;">{status_label}</span>
   </div>
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;">
     <div>
-      <div style="font-size:36px;font-weight:800;letter-spacing:-2px;line-height:1;color:#1a1a1a;">{actueel:.0f}</div>
-      <div style="font-size:12px;color:#888;margin-top:2px;">{eenheid} resterend</div>
+      <div class="kaart-getal" style="font-size:36px;font-weight:800;letter-spacing:-2px;line-height:1;">{actueel:.0f}</div>
+      <div class="kaart-subtekst" style="font-size:12px;margin-top:2px;">{eenheid} resterend</div>
     </div>
     <div>
-      <div style="font-size:10px;color:#aaa;margin-bottom:4px;text-align:right;">7 dagen</div>
+      <div class="kaart-subtekst" style="font-size:10px;margin-bottom:4px;text-align:right;">7 dagen</div>
       <svg width="{svg_w}" height="{svg_h}">{bars_svg}</svg>
     </div>
   </div>
-  <div style="position:relative;background:#f3f3f3;border-radius:99px;height:5px;margin:10px 0 4px;">
-    <div style="width:{pct:.0f}%;background:{bar_color};height:5px;border-radius:99px;"></div>
-    <div style="position:absolute;top:-3px;left:{min_pct:.0f}%;width:1.5px;height:11px;background:#ccc;border-radius:1px;"></div>
-  </div>
-  <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-bottom:14px;">
-    <span>0</span><span style="color:{status_color};">min. {minimum:.0f}</span><span>{max_val:.0f}</span>
-  </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-    <div style="background:#f8f8f8;border-radius:10px;padding:8px 10px;">
-      <div style="font-size:10px;color:#aaa;margin-bottom:1px;">Gemiddeld/dag</div>
-      <div style="font-weight:700;font-size:14px;color:#1a1a1a;">{per_dag_html} <span style="font-weight:400;font-size:11px;color:#aaa;">{eenheid}</span></div>
+    <div class="kaart-stat" style="border-radius:10px;padding:8px 10px;">
+      <div class="kaart-stat-label" style="font-size:10px;margin-bottom:1px;">Gemiddeld/dag</div>
+      <div class="kaart-stat-getal" style="font-weight:700;font-size:14px;">{per_dag_html} <span class="kaart-stat-eenheid" style="font-weight:400;font-size:11px;">{eenheid}</span></div>
     </div>
-    <div style="background:{dagen_bg};border-radius:10px;padding:8px 10px;">
-      <div style="font-size:10px;color:#aaa;margin-bottom:1px;">Nog mee</div>
+    <div class="kaart-stat" style="background:{dagen_bg};border-radius:10px;padding:8px 10px;">
+      <div class="kaart-stat-label" style="font-size:10px;margin-bottom:1px;">Nog mee</div>
       <div style="font-weight:700;font-size:14px;color:{dagen_color};">{dagen_html}</div>
     </div>
   </div>

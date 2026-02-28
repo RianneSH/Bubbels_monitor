@@ -540,6 +540,7 @@ if selected_tab == "Voorraad":
                 dag_df = baby_records[
                     (baby_records['Type'] == 'Voeding') &
                     (baby_records['Voeding_type'] == 'Fles') &
+                    (baby_records['Fles'] == 'kunstvoeding') &
                     (baby_records['Starttijd'].dt.date == dag)
                 ]
                 gram_dag = sum(
@@ -619,8 +620,8 @@ if selected_tab == "Voorraad":
 
             per_dag, dagen_resterend, history = bereken_stats(naam, eenheid, actueel)
 
-            is_laag = actueel <= minimum
-            is_waarschuwing = not is_laag and actueel <= minimum * 1.5
+            is_laag = minimum > 0 and actueel <= minimum
+            is_waarschuwing = not is_laag and minimum > 0 and actueel <= minimum * 1.5
 
             if is_laag:
                 status_bg, status_color, status_label = "#fef3f2", "#b42318", "Laag"
@@ -632,10 +633,15 @@ if selected_tab == "Voorraad":
                 status_bg, status_color, status_label = "#f0fdf4", "#166534", "Voldoende"
                 card_border, dagen_bg, dagen_color, bar_color = "#efefef", "#f0fdf4", "#166534", "#7a9e72"
 
-            # Progressbar
-            max_val = max(actueel * 1.5, minimum * 2, 1)
-            pct = min(100, actueel / max_val * 100)
-            min_pct = min(100, minimum / max_val * 100)
+            # Progressbar — max is pakgrootte of 2x actueel als minimum onbekend
+            if naam == "Kunstvoeding":
+                max_val = 700
+            elif naam == "Luiers":
+                max_val = 72
+            else:
+                max_val = max(actueel * 1.5, minimum * 2, 1)
+            pct = min(100, actueel / max_val * 100) if max_val > 0 else 0
+            min_pct = min(100, minimum / max_val * 100) if max_val > 0 else 0
 
             # Mini staafgrafiek SVG
             bar_max = max(history) if history and max(history) > 0 else 1
@@ -651,7 +657,7 @@ if selected_tab == "Voorraad":
                 bars_svg += f'<rect x="{x}" y="{svg_h - h}" width="{bar_w}" height="{h}" rx="2" fill="{fill}"/>'
 
             icon = "🧷" if naam == "Luiers" else "🍼"
-            variant_html = f'<div style="font-size:11px;color:#bbb;margin-top:1px;">{variant}</div>' if variant else ''
+            variant_html = f'<div style="font-size:11px;color:#999;margin-top:1px;">{variant}</div>' if variant else ''
             per_dag_html = f'{per_dag}' if per_dag is not None else '–'
             dagen_html = f'±{dagen_resterend} <span style="font-weight:400;font-size:11px;">dagen</span>' if dagen_resterend is not None else '–'
 
@@ -664,12 +670,12 @@ if selected_tab == "Voorraad":
                 snelkeuze_opties = []
 
             kaart_cols[i].markdown(f"""
-<div style="background:#fff;border:1.5px solid {card_border};border-radius:20px;padding:20px 20px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.04);">
+<div style="background:#ffffff;border:1.5px solid {card_border};border-radius:20px;padding:20px 20px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.04);">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <div style="display:flex;align-items:center;gap:8px;">
       <span style="font-size:22px;line-height:1;">{icon}</span>
       <div>
-        <div style="font-weight:800;font-size:14px;line-height:1.2;">{naam}</div>
+        <div style="font-weight:800;font-size:14px;line-height:1.2;color:#1a1a1a;">{naam}</div>
         {variant_html}
       </div>
     </div>
@@ -677,11 +683,11 @@ if selected_tab == "Voorraad":
   </div>
   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;">
     <div>
-      <div style="font-size:36px;font-weight:800;letter-spacing:-2px;line-height:1;">{actueel:.0f}</div>
-      <div style="font-size:12px;color:#bbb;margin-top:2px;">{eenheid} resterend</div>
+      <div style="font-size:36px;font-weight:800;letter-spacing:-2px;line-height:1;color:#1a1a1a;">{actueel:.0f}</div>
+      <div style="font-size:12px;color:#888;margin-top:2px;">{eenheid} resterend</div>
     </div>
     <div>
-      <div style="font-size:10px;color:#ccc;margin-bottom:4px;text-align:right;">7 dagen</div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:4px;text-align:right;">7 dagen</div>
       <svg width="{svg_w}" height="{svg_h}">{bars_svg}</svg>
     </div>
   </div>
@@ -689,16 +695,16 @@ if selected_tab == "Voorraad":
     <div style="width:{pct:.0f}%;background:{bar_color};height:5px;border-radius:99px;"></div>
     <div style="position:absolute;top:-3px;left:{min_pct:.0f}%;width:1.5px;height:11px;background:#ccc;border-radius:1px;"></div>
   </div>
-  <div style="display:flex;justify-content:space-between;font-size:10px;color:#ccc;margin-bottom:14px;">
+  <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-bottom:14px;">
     <span>0</span><span>min. {minimum:.0f}</span><span>{max_val:.0f}</span>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px;">
     <div style="background:#f8f8f8;border-radius:10px;padding:8px 10px;">
-      <div style="font-size:10px;color:#bbb;margin-bottom:1px;">Gemiddeld/dag</div>
-      <div style="font-weight:700;font-size:14px;">{per_dag_html} <span style="font-weight:400;font-size:11px;color:#bbb;">{eenheid}</span></div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:1px;">Gemiddeld/dag</div>
+      <div style="font-weight:700;font-size:14px;color:#1a1a1a;">{per_dag_html} <span style="font-weight:400;font-size:11px;color:#aaa;">{eenheid}</span></div>
     </div>
     <div style="background:{dagen_bg};border-radius:10px;padding:8px 10px;">
-      <div style="font-size:10px;color:#bbb;margin-bottom:1px;">Nog mee</div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:1px;">Nog mee</div>
       <div style="font-weight:700;font-size:14px;color:{dagen_color};">{dagen_html}</div>
     </div>
   </div>

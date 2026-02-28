@@ -733,7 +733,7 @@ if selected_tab == "Voorraad":
         with cc2:
             eenheid_cor = voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Eenheid'].values[0]
             huidige_waarde = float(pd.to_numeric(voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Actuele voorraad'].values[0], errors='coerce') or 0)
-            nieuwe_waarde = st.number_input(f'Werkelijke waarde ({eenheid_cor})', min_value=0.0, step=1.0, value=huidige_waarde, key='v_cor', label_visibility='collapsed')
+            nieuwe_waarde = st.number_input(f'Werkelijke waarde ({eenheid_cor})', min_value=0.0, step=1.0, value=huidige_waarde, key=f'v_cor_{prod_cor}', label_visibility='collapsed')
         with cc3:
             st.write("")
             if st.button('Opslaan', key='cor_stock', use_container_width=True):

@@ -575,69 +575,8 @@ if selected_tab == "Voorraad":
             except Exception as e:
                 st.error(f"Kon bijvulling niet loggen: {e}")
 
-    st.markdown("""
-    <style>
-    .voorraad-kaart {
-        background: var(--vk-bg, #ffffff);
-        border-color: var(--vk-border, #efefef) !important;
-    }
-    .voorraad-kaart .kaart-naam    { color: var(--vk-tekst, #1a1a1a) !important; }
-    .voorraad-kaart .kaart-getal   { color: var(--vk-tekst, #1a1a1a) !important; }
-    .voorraad-kaart .kaart-subtekst { color: var(--vk-sub, #888888) !important; }
-    .voorraad-kaart .kaart-stat    { background: var(--vk-stat-bg, #f8f8f8) !important; }
-    .voorraad-kaart .kaart-stat-label  { color: var(--vk-sub, #888888) !important; }
-    .voorraad-kaart .kaart-stat-getal  { color: var(--vk-tekst, #1a1a1a) !important; }
-    .voorraad-kaart .kaart-stat-eenheid { color: var(--vk-sub, #888888) !important; }
-    </style>
-    <script>
-    (function() {
-        function applyTheme() {
-            // Streamlit zet --background-color op de root
-            var bg = getComputedStyle(document.documentElement)
-                        .getPropertyValue('--background-color').trim();
-            var isDark = false;
-            if (bg) {
-                // Zet hex naar RGB en check luminantie
-                var hex = bg.replace('#','');
-                if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
-                var r = parseInt(hex.substr(0,2),16);
-                var g = parseInt(hex.substr(2,2),16);
-                var b = parseInt(hex.substr(4,2),16);
-                var lum = (0.299*r + 0.587*g + 0.114*b) / 255;
-                isDark = lum < 0.5;
-            }
-            var root = document.documentElement;
-            if (isDark) {
-                root.style.setProperty('--vk-bg',       '#1e1e1e');
-                root.style.setProperty('--vk-border',   '#333333');
-                root.style.setProperty('--vk-tekst',    '#f0f0f0');
-                root.style.setProperty('--vk-sub',      '#888888');
-                root.style.setProperty('--vk-stat-bg',  '#2a2a2a');
-            } else {
-                root.style.setProperty('--vk-bg',       '#ffffff');
-                root.style.setProperty('--vk-border',   '#efefef');
-                root.style.setProperty('--vk-tekst',    '#1a1a1a');
-                root.style.setProperty('--vk-sub',      '#888888');
-                root.style.setProperty('--vk-stat-bg',  '#f8f8f8');
-            }
-        }
-        applyTheme();
-        // Herdetecteer bij themawijziging
-        var observer = new MutationObserver(applyTheme);
-        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-        // Fallback: check elke seconde de eerste 5 seconden
-        var checks = 0;
-        var interval = setInterval(function() {
-            applyTheme();
-            if (++checks >= 5) clearInterval(interval);
-        }, 1000);
-    })();
-    </script>
-    <div style="margin-bottom:4px;">
-        <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;">📦 Voorraad</span>
-    </div>
-    <div style="font-size:12px;color:#bbb;margin-bottom:20px;">Gebaseerd op verbruik afgelopen 7 dagen</div>
-    """, unsafe_allow_html=True)
+    st.title("📦 Voorraad")
+    st.caption("Gebaseerd op verbruik afgelopen 7 dagen")
 
     if voorraad.empty:
         st.info('Geen voorraaddata beschikbaar. Controleer je Google Sheet.')
@@ -647,24 +586,14 @@ if selected_tab == "Voorraad":
         for _, r in voorraad.iterrows():
             actueel = pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0
             minimum = pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0
-            if actueel <= minimum:
+            if minimum > 0 and actueel <= minimum:
                 naam = r.get('Productnaam', 'Onbekend')
                 eenheid = r.get('Eenheid', 'stuks')
                 _, dagen_r, _ = bereken_stats(naam, eenheid, actueel)
                 dagen_str = f", genoeg voor ±{dagen_r} dagen" if dagen_r is not None else ""
-                lage_voorraad_items.append(f"{naam} — {actueel:.0f} {eenheid} resterend{dagen_str}")
-
+                lage_voorraad_items.append(f"**{naam}** — {actueel:.0f} {eenheid} resterend{dagen_str}")
         if lage_voorraad_items:
-            items_html = "".join(f'<div style="font-size:12px;color:#b42318;margin-top:2px;">{item}</div>' for item in lage_voorraad_items)
-            st.markdown(f"""
-<div style="background:#fef3f2;border:1px solid #fecdca;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;gap:10px;">
-  <span style="font-size:18px;margin-top:1px;">⚠️</span>
-  <div>
-    <div style="font-weight:700;color:#b42318;font-size:13px;">Lage voorraad</div>
-    {items_html}
-  </div>
-</div>
-""", unsafe_allow_html=True)
+            st.error("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad_items))
 
         # --- Voorraadkaarten ---
         kaart_cols = st.columns(len(voorraad))
@@ -681,23 +610,16 @@ if selected_tab == "Voorraad":
             is_waarschuwing = not is_laag and minimum > 0 and actueel <= minimum * 1.5
 
             if is_laag:
-                status_bg, status_color, status_label = "#fef3f2", "#b42318", "Laag"
-                card_border, dagen_bg, dagen_color, bar_color = "#fecdca", "#fef3f2", "#b42318", "#e74c3c"
+                status_label, dagen_color, bar_color = "🔴 Laag", "#e74c3c", "#e74c3c"
             elif is_waarschuwing:
-                status_bg, status_color, status_label = "#fffaeb", "#b54708", "Let op"
-                card_border, dagen_bg, dagen_color, bar_color = "#e8e8e8", "#fffaeb", "#b54708", "#e67e22"
+                status_label, dagen_color, bar_color = "🟠 Let op", "#e67e22", "#e67e22"
             else:
-                status_bg, status_color, status_label = "#f0fdf4", "#166534", "Voldoende"
-                card_border, dagen_bg, dagen_color, bar_color = "#efefef", "#f0fdf4", "#166534", "#7a9e72"
-
-            # Geen progressbar meer nodig
+                status_label, dagen_color, bar_color = "🟢 Voldoende", "#7a9e72", "#7a9e72"
 
             # Mini staafgrafiek SVG
             bar_max = max(history) if history and max(history) > 0 else 1
-            bar_w = 6
-            bar_gap = 3
+            bar_w, bar_gap, svg_h = 6, 3, 28
             svg_w = len(history) * (bar_w + bar_gap) - bar_gap
-            svg_h = 28
             bars_svg = ""
             for j, v in enumerate(history):
                 h = max(2, int((v / bar_max) * svg_h))
@@ -706,52 +628,35 @@ if selected_tab == "Voorraad":
                 bars_svg += f'<rect x="{x}" y="{svg_h - h}" width="{bar_w}" height="{h}" rx="2" fill="{fill}"/>'
 
             icon = "🧷" if naam == "Luiers" else "🍼"
-            variant_html = f'<div class="kaart-subtekst" style="font-size:11px;margin-top:1px;">{variant}</div>' if variant else ''
-            per_dag_html = f'{per_dag}' if per_dag is not None else '–'
-            dagen_html = f'±{dagen_resterend} <span style="font-weight:400;font-size:11px;">dagen</span>' if dagen_resterend is not None else '–'
+            label = f"{icon} {naam}" + (f" · {variant}" if variant else "")
 
-            # Bijvulknoppen HTML
-            if naam == "Kunstvoeding":
-                snelkeuze_opties = [("1 pak (700g)", 700), ("2 pakken", 1400), ("3 pakken", 2100)]
-            elif naam == "Luiers":
-                snelkeuze_opties = [("Midi pak (48)", 48), ("Groot pak (108)", 108)]
-            else:
-                snelkeuze_opties = []
+            per_dag_str = f"{per_dag} {eenheid}" if per_dag is not None else "–"
+            dagen_str = f"±{dagen_resterend} dagen" if dagen_resterend is not None else "–"
 
-            kaart_cols[i].markdown(f"""
-<div class="voorraad-kaart" style="border:1.5px solid {card_border};border-radius:20px;padding:20px 20px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.04);">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:22px;line-height:1;">{icon}</span>
-      <div>
-        <div class="kaart-naam" style="font-weight:800;font-size:14px;line-height:1.2;">{naam}</div>
-        {variant_html}
-      </div>
-    </div>
-    <span style="background:{status_bg};color:{status_color};font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;letter-spacing:0.3px;text-transform:uppercase;">{status_label}</span>
-  </div>
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;">
-    <div>
-      <div class="kaart-getal" style="font-size:36px;font-weight:800;letter-spacing:-2px;line-height:1;">{actueel:.0f}</div>
-      <div class="kaart-subtekst" style="font-size:12px;margin-top:2px;">{eenheid} resterend</div>
-    </div>
-    <div>
-      <div class="kaart-subtekst" style="font-size:10px;margin-bottom:4px;text-align:right;">7 dagen</div>
-      <svg width="{svg_w}" height="{svg_h}">{bars_svg}</svg>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-    <div class="kaart-stat" style="border-radius:10px;padding:8px 10px;">
-      <div class="kaart-stat-label" style="font-size:10px;margin-bottom:1px;">Gemiddeld/dag</div>
-      <div class="kaart-stat-getal" style="font-weight:700;font-size:14px;">{per_dag_html} <span class="kaart-stat-eenheid" style="font-weight:400;font-size:11px;">{eenheid}</span></div>
-    </div>
-    <div class="kaart-stat" style="background:{dagen_bg};border-radius:10px;padding:8px 10px;">
-      <div class="kaart-stat-label" style="font-size:10px;margin-bottom:1px;">Nog mee</div>
-      <div style="font-weight:700;font-size:14px;color:{dagen_color};">{dagen_html}</div>
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+            with kaart_cols[i].container(border=True):
+                # Header
+                c1, c2 = st.columns([3, 1])
+                c1.markdown(f"**{label}**")
+                c2.markdown(f"<div style='text-align:right'>{status_label}</div>", unsafe_allow_html=True)
+
+                # Groot getal + grafiek
+                c1, c2 = st.columns([2, 1])
+                c1.metric(
+                    label=f"{eenheid} resterend",
+                    value=f"{actueel:.0f}",
+                    delta=f"min. {minimum:.0f}" if minimum > 0 else None,
+                    delta_color="off"
+                )
+                c2.markdown(
+                    f"<div style='text-align:right'><div style='font-size:10px;color:#aaa;margin-bottom:4px;'>7 dagen</div>"
+                    f"<svg width='{svg_w}' height='{svg_h}'>{bars_svg}</svg></div>",
+                    unsafe_allow_html=True
+                )
+
+                # Stats
+                s1, s2 = st.columns(2)
+                s1.metric("Gemiddeld/dag", per_dag_str)
+                s2.metric("Nog mee", dagen_str)
 
         st.caption("Schatting gebaseerd op gemiddeld verbruik afgelopen 7 dagen")
         st.divider()

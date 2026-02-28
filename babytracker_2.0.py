@@ -159,8 +159,8 @@ def get_voorraad_row(productnaam):
     if not mask.any():
         return 0, 0, 'stuks', ''
     r = voorraad[mask].iloc[0]
-    actueel = int(pd.to_numeric(r.get('Actuele_voorraad', 0), errors='coerce') or 0)
-    minimum = int(pd.to_numeric(r.get('Minimum_voorraad', 0), errors='coerce') or 0)
+    actueel = int(pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0)
+    minimum = int(pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0)
     eenheid = r.get('Eenheid', 'stuks')
     variant = r.get('Variant', '')
     return actueel, minimum, eenheid, variant
@@ -173,7 +173,7 @@ def update_voorraad(productnaam, hoeveelheid):
     if not mask.any():
         st.error("Product niet gevonden")
         return
-    col = 'Actuele_voorraad'
+    col = 'Actuele voorraad'
     voorraad.loc[mask, col] = (
         pd.to_numeric(voorraad.loc[mask, col], errors='coerce').fillna(0) + hoeveelheid
     ).round(1)
@@ -331,8 +331,8 @@ if selected_tab == "Dashboard":
     if not voorraad.empty:
         lage_voorraad = []
         for _, r in voorraad.iterrows():
-            actueel = int(pd.to_numeric(r.get('Actuele_voorraad', 0), errors='coerce') or 0)
-            minimum = int(pd.to_numeric(r.get('Minimum_voorraad', 0), errors='coerce') or 0)
+            actueel = int(pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0)
+            minimum = int(pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0)
             if actueel <= minimum:
                 naam = r.get('Productnaam', 'Onbekend')
                 eenheid = r.get('Eenheid', 'stuks')
@@ -532,8 +532,8 @@ if selected_tab == "Voorraad":
         # --- Lage voorraad banner ---
         lage_voorraad = []
         for _, r in voorraad.iterrows():
-            actueel = pd.to_numeric(r.get('Actuele_voorraad', 0), errors='coerce') or 0
-            minimum = pd.to_numeric(r.get('Minimum_voorraad', 0), errors='coerce') or 0
+            actueel = pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0
+            minimum = pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0
             if actueel <= minimum:
                 naam = r.get('Productnaam', 'Onbekend')
                 eenheid = r.get('Eenheid', 'stuks')
@@ -544,18 +544,21 @@ if selected_tab == "Voorraad":
             st.error("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad))
 
         # --- Voorraadkaarten ---
-        cols = st.columns(len(voorraad))
+        STANDAARD_FLESSEN = [(65, 2), (100, 3), (135, 4), (165, 5), (200, 6)]
+        gram_per_schep = float(inst.get('kunstvoeding_gram_per_schep', 4.4))
+
+        kaart_cols = st.columns(len(voorraad))
         for i, (_, r) in enumerate(voorraad.iterrows()):
             naam = r.get('Productnaam', 'Onbekend')
             variant = r.get('Variant', '')
             eenheid = r.get('Eenheid', 'stuks')
-            actueel = pd.to_numeric(r.get('Actuele_voorraad', 0), errors='coerce') or 0
-            minimum = pd.to_numeric(r.get('Minimum_voorraad', 0), errors='coerce') or 0
-            status = "🟢" if actueel > minimum * 2 else ("🟠" if actueel > minimum else "🔴")
-            label = naam + (f" ({variant})" if variant else "")
+            actueel = pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0
+            minimum = pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0
 
-            # Schatting wanneer voorraad opraakt op basis van verbruik afgelopen 7 dagen
+            # Bereken verbruik per dag + dagen resterend
+            per_dag = None
             dagen_resterend = None
+
             if naam == "Kunstvoeding" and not baby_records.empty:
                 kv_df = baby_records[
                     (baby_records['Type'] == 'Voeding') &
@@ -563,15 +566,13 @@ if selected_tab == "Voorraad":
                     (baby_records['Starttijd'] >= pd.Timestamp.now() - pd.Timedelta(days=7))
                 ].copy()
                 if not kv_df.empty:
-                    STANDAARD_FLESSEN = [(65, 2), (100, 3), (135, 4), (165, 5), (200, 6)]
-                    gram_per_schep = float(inst.get('kunstvoeding_gram_per_schep', 4.4))
                     totaal_gram_7d = sum(
                         next((s for ev, s in STANDAARD_FLESSEN if ev >= row['Hoeveelheid']), 6) * gram_per_schep
-                        for _, row in kv_df.iterrows() if row.get('Voeding_type') == 'Fles'
+                        for _, row in kv_df.iterrows()
                     )
-                    gram_per_dag = totaal_gram_7d / 7
-                    if gram_per_dag > 0:
-                        dagen_resterend = int(actueel / gram_per_dag)
+                    per_dag = round(totaal_gram_7d / 7, 1)
+                    if per_dag > 0:
+                        dagen_resterend = int(actueel / per_dag)
 
             elif naam == "Luiers" and not baby_records.empty:
                 luier_7d = baby_records[
@@ -579,16 +580,71 @@ if selected_tab == "Voorraad":
                     (baby_records['Starttijd'] >= pd.Timestamp.now() - pd.Timedelta(days=7))
                 ]
                 if not luier_7d.empty:
-                    per_dag = len(luier_7d) / 7
+                    per_dag = round(len(luier_7d) / 7, 1)
                     if per_dag > 0:
                         dagen_resterend = int(actueel / per_dag)
 
-            delta_str = f"min. {minimum:.0f} {eenheid}"
-            if dagen_resterend is not None:
-                delta_str += f"  ·  ±{dagen_resterend} dagen"
+            # Kleur bepalen
+            is_laag = actueel <= minimum
+            is_waarschuwing = actueel <= minimum * 1.5
 
-            cols[i].metric(f"{status} {label}", f"{actueel:.0f} {eenheid}", delta=delta_str)
+            if is_laag:
+                status_bg = "#fef3f2"; status_color = "#b42318"; status_label = "● Laag"
+                card_border = "#fecdca"; dagen_bg = "#fef3f2"; dagen_color = "#b42318"
+            elif is_waarschuwing:
+                status_bg = "#fffaeb"; status_color = "#b54708"; status_label = "● Let op"
+                card_border = "#e8e8e8"; dagen_bg = "#fffaeb"; dagen_color = "#b54708"
+            else:
+                status_bg = "#f0fdf4"; status_color = "#166534"; status_label = "● Voldoende"
+                card_border = "#e8e8e8"; dagen_bg = "#f0fdf4"; dagen_color = "#166534"
 
+            # Progressbar berekening
+            max_val = actueel * 2 if actueel > minimum else minimum * 3
+            pct = min(100, (actueel / max_val * 100)) if max_val > 0 else 0
+            min_pct = min(100, (minimum / max_val * 100)) if max_val > 0 else 0
+            bar_color = "#e74c3c" if is_laag else ("#e67e22" if is_waarschuwing else "#7a9e72")
+
+            icon = "🧷" if naam == "Luiers" else "🍼"
+            variant_html = f'<div style="font-size:12px;color:#aaa;">{variant}</div>' if variant else ''
+            per_dag_html = f'{per_dag}' if per_dag is not None else '–'
+            dagen_html = f'±{dagen_resterend} <span style="font-weight:400;font-size:12px;">dagen</span>' if dagen_resterend is not None else '–'
+
+            kaart_cols[i].markdown(f"""
+<div style="background:#fff;border:1px solid {card_border};border-radius:18px;padding:20px 22px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:22px;">{icon}</span>
+      <div>
+        <div style="font-weight:700;font-size:15px;">{naam}</div>
+        {variant_html}
+      </div>
+    </div>
+    <span style="background:{status_bg};color:{status_color};font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{status_label}</span>
+  </div>
+  <div style="margin:14px 0 0;">
+    <span style="font-size:34px;font-weight:700;letter-spacing:-1px;">{actueel:.0f}</span>
+    <span style="font-size:14px;color:#888;margin-left:6px;">{eenheid}</span>
+  </div>
+  <div style="position:relative;background:#f0f0f0;border-radius:99px;height:6px;margin:12px 0 6px;">
+    <div style="width:{pct:.0f}%;background:{bar_color};height:6px;border-radius:99px;"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:14px;">
+    <span>0</span><span>min. {minimum:.0f}</span><span>{actueel:.0f}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div style="background:#f8f8f8;border-radius:10px;padding:10px 12px;">
+      <div style="font-size:11px;color:#aaa;margin-bottom:2px;">Per dag</div>
+      <div style="font-weight:700;font-size:15px;">{per_dag_html} <span style="font-weight:400;font-size:12px;color:#888;">{eenheid}</span></div>
+    </div>
+    <div style="background:{dagen_bg};border-radius:10px;padding:10px 12px;">
+      <div style="font-size:11px;color:#aaa;margin-bottom:2px;">Nog mee</div>
+      <div style="font-weight:700;font-size:15px;color:{dagen_color};">{dagen_html}</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+        st.caption("Schatting gebaseerd op gemiddeld verbruik afgelopen 7 dagen")
         st.divider()
 
         # --- Bijvullen ---
@@ -665,7 +721,7 @@ if selected_tab == "Voorraad":
         prod_cor = st.pills("Product", prod_namen, key='p_cor')
         if prod_cor:
             eenheid_cor = voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Eenheid'].values[0]
-            huidige_waarde = float(pd.to_numeric(voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Actuele_voorraad'].values[0], errors='coerce') or 0)
+            huidige_waarde = float(pd.to_numeric(voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Actuele voorraad'].values[0], errors='coerce') or 0)
             col1, col2 = st.columns([3, 1])
             with col1:
                 nieuwe_waarde = st.number_input(f'Werkelijke voorraad ({eenheid_cor})', min_value=0.0, step=1.0, value=huidige_waarde, key='v_cor')

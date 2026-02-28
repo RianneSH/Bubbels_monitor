@@ -98,6 +98,7 @@ DEFAULTS = {
     'voeding_default_ml': '100',
     'voeding_default_kolven_ml': '10',
     'voeding_default_hapje_gram': '50',
+    'kunstvoeding_gram_per_schep': '4.4',
     'slaap_default_duur': '60',
     'luier_default_type': 'Nat',
     'activiteit_default_duur': '15',
@@ -150,6 +151,20 @@ def now_device():
 # ------------------------------
 # Voorraad helpers
 # ------------------------------
+def get_voorraad_row(productnaam):
+    """Geeft (actueel, minimum, eenheid, variant) terug voor een product."""
+    if voorraad.empty:
+        return 0, 0, 'stuks', ''
+    mask = voorraad['Productnaam'] == productnaam
+    if not mask.any():
+        return 0, 0, 'stuks', ''
+    r = voorraad[mask].iloc[0]
+    actueel = int(pd.to_numeric(r.get('Actuele_voorraad', 0), errors='coerce') or 0)
+    minimum = int(pd.to_numeric(r.get('Minimum_voorraad', 0), errors='coerce') or 0)
+    eenheid = r.get('Eenheid', 'stuks')
+    variant = r.get('Variant', '')
+    return actueel, minimum, eenheid, variant
+
 def update_voorraad(productnaam, hoeveelheid):
     if voorraad.empty or sheet_voorraad is None:
         st.warning("Voorraad niet beschikbaar")
@@ -158,14 +173,15 @@ def update_voorraad(productnaam, hoeveelheid):
     if not mask.any():
         st.error("Product niet gevonden")
         return
-    voorraad.loc[mask, 'Actuele voorraad'] = (
-        pd.to_numeric(voorraad.loc[mask, 'Actuele voorraad'], errors='coerce').fillna(0) + hoeveelheid
-    ).astype(int)
-    voorraad.loc[voorraad['Actuele voorraad'] < 0, 'Actuele voorraad'] = 0
+    col = 'Actuele_voorraad'
+    voorraad.loc[mask, col] = (
+        pd.to_numeric(voorraad.loc[mask, col], errors='coerce').fillna(0) + hoeveelheid
+    ).round(1)
+    voorraad.loc[voorraad[col] < 0, col] = 0
     row_idx = mask[mask].index[0] + 2
-    col_idx = voorraad.columns.get_loc('Actuele voorraad') + 1
+    col_idx = voorraad.columns.get_loc(col) + 1
     try:
-        sheet_voorraad.update_cell(row_idx, col_idx, int(voorraad.loc[mask, 'Actuele voorraad'].values[0]))
+        sheet_voorraad.update_cell(row_idx, col_idx, float(voorraad.loc[mask, col].values[0]))
     except Exception as e:
         st.error(f"Kon voorraad niet updaten: {e}")
 
@@ -311,6 +327,21 @@ if selected_tab == "Dashboard":
     else:
         col5.metric("🎈 Activiteiten vandaag", "0")
 
+    # Lage voorraad waarschuwingen
+    if not voorraad.empty:
+        lage_voorraad = []
+        for _, r in voorraad.iterrows():
+            actueel = int(pd.to_numeric(r.get('Actuele_voorraad', 0), errors='coerce') or 0)
+            minimum = int(pd.to_numeric(r.get('Minimum_voorraad', 0), errors='coerce') or 0)
+            if actueel <= minimum:
+                naam = r.get('Productnaam', 'Onbekend')
+                eenheid = r.get('Eenheid', 'stuks')
+                variant = r.get('Variant', '')
+                label = f"{naam}" + (f" ({variant})" if variant else "")
+                lage_voorraad.append(f"**{label}** — nog {actueel} {eenheid}")
+        if lage_voorraad:
+            st.warning("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad))
+
     gez_df = baby_records[baby_records['Type'] == 'Gezondheid']
     if not gez_df.empty:
         laatste_gez = gez_df.sort_values('Starttijd', ascending=False).iloc[0]
@@ -394,6 +425,16 @@ if selected_tab == "Voeding":
             [start_dt, '', hoeveelheid if voeding_type != 'Kolven' else '', opm, '', borst, kolven, fles, voeding_type, hapje_type, '', '', ''],
             rerun=False
         )
+        # Automatisch voorraad verlagen
+        if voeding_type == 'Fles' and fles == 'kunstvoeding' and hoeveelheid > 0:
+            gram_per_schep = float(inst.get('kunstvoeding_gram_per_schep', 4.4))
+            # Standaard flesgroottes Héro: (ml eindvolume, scheppen)
+            STANDAARD_FLESSEN = [(65, 2), (100, 3), (135, 4), (165, 5), (200, 6)]
+            # Exacte match of dichtstbijzijnde erboven
+            scheppen = next((s for eindvol, s in STANDAARD_FLESSEN if eindvol >= hoeveelheid), STANDAARD_FLESSEN[-1][1])
+            gram = round(scheppen * gram_per_schep, 1)
+            update_voorraad("Kunstvoeding", -gram)
+            st.caption(f"🍼 {scheppen} scheppen = {gram}g kunstvoeding afgetrokken van voorraad")
         st.success("Voeding opgeslagen ✅")
 
 # ------------------------------
@@ -428,7 +469,7 @@ if selected_tab == "Gezondheid":
 # TAB: Activiteiten
 # ------------------------------
 if selected_tab == "Activiteiten":
-    st.title("🎈 Activiteit toevoegen")
+    st.title("🎈 Activiteiten toevoegen")
 
     ACTIVITEITEN = [
         ("🐛", "Tummy time"),
@@ -483,41 +524,172 @@ if selected_tab == "Activiteiten":
 # TAB: Voorraad
 # ------------------------------
 if selected_tab == "Voorraad":
-    st.title("📦 Voorraad beheren")
+    st.title("📦 Voorraad")
 
     if voorraad.empty:
-        st.info('Geen voorraaddata')
+        st.info('Geen voorraaddata beschikbaar. Controleer je Google Sheet.')
     else:
-        st.subheader("Huidige voorraad")
+        # --- Lage voorraad banner ---
+        lage_voorraad = []
         for _, r in voorraad.iterrows():
-            try:
-                val = int(pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0)
-                minv = int(pd.to_numeric(r.get('Minimum voorraad', 0), errors='coerce') or 0)
-            except Exception:
-                val = 0
-                minv = 0
-            kleur = '🟢' if val > minv + 2 else ('🟠' if val > minv else '🔴')
-            st.markdown(f"**{kleur} {r.get('Productnaam','Onbekend')}** — {val} (min {minv})")
+            actueel = pd.to_numeric(r.get('Actuele_voorraad', 0), errors='coerce') or 0
+            minimum = pd.to_numeric(r.get('Minimum_voorraad', 0), errors='coerce') or 0
+            if actueel <= minimum:
+                naam = r.get('Productnaam', 'Onbekend')
+                eenheid = r.get('Eenheid', 'stuks')
+                variant = r.get('Variant', '')
+                label = naam + (f" ({variant})" if variant else "")
+                lage_voorraad.append(f"**{label}** — nog {actueel:.0f} {eenheid}")
+        if lage_voorraad:
+            st.error("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad))
 
-    st.subheader('Bijvullen')
-    prod_to_add = st.selectbox('Product', voorraad['Productnaam'].tolist() if not voorraad.empty else [], key='p_add')
-    aantal_to_add = st.number_input('Aantal toevoegen', min_value=1, value=1, key='a_add')
-    if st.button('Voorraad bijvullen', key='add_stock'):
-        update_voorraad(prod_to_add, int(aantal_to_add))
-        if sheet_bijvulling is not None:
-            sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), prod_to_add, int(aantal_to_add)])
-        st.success('Voorraad bijgewerkt')
+        # --- Voorraadkaarten ---
+        cols = st.columns(len(voorraad))
+        for i, (_, r) in enumerate(voorraad.iterrows()):
+            naam = r.get('Productnaam', 'Onbekend')
+            variant = r.get('Variant', '')
+            eenheid = r.get('Eenheid', 'stuks')
+            actueel = pd.to_numeric(r.get('Actuele_voorraad', 0), errors='coerce') or 0
+            minimum = pd.to_numeric(r.get('Minimum_voorraad', 0), errors='coerce') or 0
+            status = "🟢" if actueel > minimum * 2 else ("🟠" if actueel > minimum else "🔴")
+            label = naam + (f" ({variant})" if variant else "")
 
-    st.subheader('Verwijderen')
-    prod_to_remove = st.selectbox('Product', voorraad['Productnaam'].tolist() if not voorraad.empty else [], key='p_rem')
-    try:
-        maxv = int(pd.to_numeric(voorraad.loc[voorraad['Productnaam'] == prod_to_remove, 'Actuele voorraad'].values[0]) or 0)
-    except Exception:
-        maxv = 0
-    aantal_to_remove = st.number_input('Aantal verwijderen', min_value=1, max_value=max(maxv, 1), value=1, key='a_rem')
-    if st.button('Voorraad verminderen', key='rem_stock'):
-        update_voorraad(prod_to_remove, -int(aantal_to_remove))
-        st.success('Voorraad bijgewerkt')
+            # Schatting wanneer voorraad opraakt op basis van verbruik afgelopen 7 dagen
+            dagen_resterend = None
+            if naam == "Kunstvoeding" and not baby_records.empty:
+                kv_df = baby_records[
+                    (baby_records['Type'] == 'Voeding') &
+                    (baby_records['Voeding_type'] == 'Fles') &
+                    (baby_records['Starttijd'] >= pd.Timestamp.now() - pd.Timedelta(days=7))
+                ].copy()
+                if not kv_df.empty:
+                    STANDAARD_FLESSEN = [(65, 2), (100, 3), (135, 4), (165, 5), (200, 6)]
+                    gram_per_schep = float(inst.get('kunstvoeding_gram_per_schep', 4.4))
+                    totaal_gram_7d = sum(
+                        next((s for ev, s in STANDAARD_FLESSEN if ev >= row['Hoeveelheid']), 6) * gram_per_schep
+                        for _, row in kv_df.iterrows() if row.get('Voeding_type') == 'Fles'
+                    )
+                    gram_per_dag = totaal_gram_7d / 7
+                    if gram_per_dag > 0:
+                        dagen_resterend = int(actueel / gram_per_dag)
+
+            elif naam == "Luiers" and not baby_records.empty:
+                luier_7d = baby_records[
+                    (baby_records['Type'] == 'Luier') &
+                    (baby_records['Starttijd'] >= pd.Timestamp.now() - pd.Timedelta(days=7))
+                ]
+                if not luier_7d.empty:
+                    per_dag = len(luier_7d) / 7
+                    if per_dag > 0:
+                        dagen_resterend = int(actueel / per_dag)
+
+            delta_str = f"min. {minimum:.0f} {eenheid}"
+            if dagen_resterend is not None:
+                delta_str += f"  ·  ±{dagen_resterend} dagen"
+
+            cols[i].metric(f"{status} {label}", f"{actueel:.0f} {eenheid}", delta=delta_str)
+
+        st.divider()
+
+        # --- Bijvullen ---
+        st.subheader("📥 Bijvullen")
+        prod_namen = voorraad['Productnaam'].tolist()
+        prod_to_add = st.pills("Product", prod_namen, key='p_add')
+
+        if prod_to_add:
+            eenheid_add = voorraad.loc[voorraad['Productnaam'] == prod_to_add, 'Eenheid'].values[0] if not voorraad.empty else 'stuks'
+
+            # Snelknoppen voor kunstvoeding (pak van 700g)
+            if prod_to_add == "Kunstvoeding":
+                st.caption("Snelkeuze")
+                qcol1, qcol2, qcol3 = st.columns(3)
+                if qcol1.button("➕ 1 pak (700g)", key='kv_1pak'):
+                    update_voorraad("Kunstvoeding", 700)
+                    if sheet_bijvulling:
+                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Kunstvoeding", 700])
+                    st.toast("700g kunstvoeding toegevoegd ✅")
+                    st.cache_data.clear()
+                    st.rerun()
+                if qcol2.button("➕ 2 pakken (1400g)", key='kv_2pak'):
+                    update_voorraad("Kunstvoeding", 1400)
+                    if sheet_bijvulling:
+                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Kunstvoeding", 1400])
+                    st.toast("1400g kunstvoeding toegevoegd ✅")
+                    st.cache_data.clear()
+                    st.rerun()
+                if qcol3.button("➕ 3 pakken (2100g)", key='kv_3pak'):
+                    update_voorraad("Kunstvoeding", 2100)
+                    if sheet_bijvulling:
+                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Kunstvoeding", 2100])
+                    st.toast("2100g kunstvoeding toegevoegd ✅")
+                    st.cache_data.clear()
+                    st.rerun()
+
+            # Snelknoppen voor luiers (per pak)
+            if prod_to_add == "Luiers":
+                st.caption("Snelkeuze")
+                qcol1, qcol2 = st.columns(2)
+                if qcol1.button("➕ Klein pak (~44 stuks)", key='l_klein'):
+                    update_voorraad("Luiers", 44)
+                    if sheet_bijvulling:
+                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Luiers", 44])
+                    st.toast("44 luiers toegevoegd ✅")
+                    st.cache_data.clear()
+                    st.rerun()
+                if qcol2.button("➕ Groot pak (~72 stuks)", key='l_groot'):
+                    update_voorraad("Luiers", 72)
+                    if sheet_bijvulling:
+                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Luiers", 72])
+                    st.toast("72 luiers toegevoegd ✅")
+                    st.cache_data.clear()
+                    st.rerun()
+
+            st.caption("Aangepaste hoeveelheid")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                aantal_to_add = st.number_input(f'Aantal ({eenheid_add})', min_value=0.0, step=1.0, value=1.0, key='a_add', label_visibility="collapsed")
+            with col2:
+                st.write("")
+                if st.button('➕ Toevoegen', key='add_stock', use_container_width=True):
+                    update_voorraad(prod_to_add, float(aantal_to_add))
+                    if sheet_bijvulling:
+                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), prod_to_add, aantal_to_add])
+                    st.toast(f'{prod_to_add} bijgevuld met {aantal_to_add} {eenheid_add} ✅')
+                    st.cache_data.clear()
+                    st.rerun()
+
+        # --- Handmatige correctie ---
+        st.divider()
+        st.subheader("🔧 Voorraad corrigeren")
+        st.caption("Gebruik dit als de werkelijke voorraad afwijkt van wat de app bijhoudt.")
+        prod_cor = st.pills("Product", prod_namen, key='p_cor')
+        if prod_cor:
+            eenheid_cor = voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Eenheid'].values[0]
+            huidige_waarde = float(pd.to_numeric(voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Actuele_voorraad'].values[0], errors='coerce') or 0)
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                nieuwe_waarde = st.number_input(f'Werkelijke voorraad ({eenheid_cor})', min_value=0.0, step=1.0, value=huidige_waarde, key='v_cor')
+            with col2:
+                st.write("")
+                if st.button('💾 Opslaan', key='cor_stock', use_container_width=True):
+                    verschil = nieuwe_waarde - huidige_waarde
+                    update_voorraad(prod_cor, verschil)
+                    if sheet_bijvulling:
+                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), f"{prod_cor} (correctie)", verschil])
+                    st.toast(f'Voorraad {prod_cor} gecorrigeerd naar {nieuwe_waarde:.0f} {eenheid_cor} ✅')
+                    st.cache_data.clear()
+                    st.rerun()
+
+        st.divider()
+
+        # --- Verbruikshistorie ---
+        if not bijvullingen.empty:
+            with st.expander("📈 Bijvulhistorie"):
+                bv_df = bijvullingen.copy()
+                bv_df['Datum'] = pd.to_datetime(bv_df['Datum'], errors='coerce')
+                bv_df = bv_df.dropna(subset=['Datum']).sort_values('Datum', ascending=False)
+                st.dataframe(bv_df[['Datum', 'Productnaam', 'Hoeveelheid']].head(20), use_container_width=True)
+
 
 # ------------------------------
 # TAB: Bewerk records
@@ -542,18 +714,18 @@ if selected_tab == "Bewerk records":
                 ACTIVITEITEN_NAMEN = ["Tummy time", "Bad", "Douchen", "Wandelen", "Zwemmen", "Familie/vrienden", "CJG/Dokter", "Speelmat", "Draagdoek"]
                 REACTIE_LABELS = ["Boos", "Huilerig", "Neutraal", "Blij", "Heel blij"]
 
-                act_idx = ACTIVITEITEN_NAMEN.index(record.get('Activiteit_type', 'Tummy time')) if record.get('Activiteit_type') in ACTIVITEITEN_NAMEN else 0
+                act_idx = ACTIVITEITEN_NAMEN.index((record['Activiteit_type'] if 'Activiteit_type' in record.index else 'Tummy time')) if (record['Activiteit_type'] if 'Activiteit_type' in record.index else None) in ACTIVITEITEN_NAMEN else 0
                 activiteit_type = st.selectbox('Activiteit', ACTIVITEITEN_NAMEN, index=act_idx)
 
                 col1, col2 = st.columns(2)
                 with col1:
                     tijdstip = st.time_input('Tijdstip', record['Starttijd'].time())
                 with col2:
-                    duur = st.number_input('Duur (minuten)', min_value=0, value=int(record.get('Duur', 15)))
+                    duur = st.number_input('Duur (minuten)', min_value=0, value=int((record['Duur'] if 'Duur' in record.index else 15)))
 
-                reactie_idx = REACTIE_LABELS.index(record.get('Reactie', 'Blij')) if record.get('Reactie') in REACTIE_LABELS else 3
+                reactie_idx = REACTIE_LABELS.index((record['Reactie'] if 'Reactie' in record.index else 'Blij')) if (record['Reactie'] if 'Reactie' in record.index else None) in REACTIE_LABELS else 3
                 reactie = st.selectbox('Reactie', REACTIE_LABELS, index=reactie_idx)
-                opm = st.text_input('Opmerking', record.get('Opmerking', ''))
+                opm = st.text_input('Opmerking', (record['Opmerking'] if 'Opmerking' in record.index else ''))
 
                 if st.button('Opslaan wijziging activiteit'):
                     start_dt = get_device_datetime(tijdstip, record['Starttijd'].date())
@@ -585,8 +757,8 @@ if selected_tab == "Bewerk records":
 
                 if record_type == 'Slaap':
                     start = st.time_input('Starttijd', record['Starttijd'].time())
-                    duur = st.number_input('Duur (min)', value=int(record.get('Hoeveelheid', 0)), min_value=0)
-                    opm = st.text_input('Opmerking', record.get('Opmerking', ''))
+                    duur = st.number_input('Duur (min)', value=int((record['Hoeveelheid'] if 'Hoeveelheid' in record.index else 0)), min_value=0)
+                    opm = st.text_input('Opmerking', (record['Opmerking'] if 'Opmerking' in record.index else ''))
                     if st.button('Opslaan wijziging slaap'):
                         start_dt = get_device_datetime(start)
                         eind_dt = start_dt + timedelta(minutes=duur)
@@ -594,25 +766,25 @@ if selected_tab == "Bewerk records":
 
                 elif record_type == 'Voeding':
                     start = st.time_input('Tijdstip', record['Starttijd'].time())
-                    hoeveelheid = st.number_input('Hoeveelheid', value=int(record.get('Hoeveelheid', 0)), min_value=0)
-                    opm = st.text_input('Opmerking', record.get('Opmerking', ''))
+                    hoeveelheid = st.number_input('Hoeveelheid', value=int((record['Hoeveelheid'] if 'Hoeveelheid' in record.index else 0)), min_value=0)
+                    opm = st.text_input('Opmerking', (record['Opmerking'] if 'Opmerking' in record.index else ''))
                     if st.button('Opslaan wijziging voeding'):
                         start_dt = get_device_datetime(start)
                         edit_record(sheet_row, {3: start_dt.strftime('%Y-%m-%d %H:%M'), 5: hoeveelheid, 6: opm})
 
                 elif record_type == 'Luier':
                     start = st.time_input('Tijdstip', record['Starttijd'].time())
-                    typ = st.selectbox('Type luier', ['Nat', 'Vuil'], index=['Nat', 'Vuil'].index(record.get('Type Luier', 'Nat')))
-                    opm = st.text_input('Opmerking', record.get('Opmerking', ''))
+                    typ = st.selectbox('Type luier', ['Nat', 'Vuil'], index=['Nat', 'Vuil'].index((record['Type Luier'] if 'Type Luier' in record.index else 'Nat')))
+                    opm = st.text_input('Opmerking', (record['Opmerking'] if 'Opmerking' in record.index else ''))
                     if st.button('Opslaan wijziging luier'):
                         start_dt = get_device_datetime(start)
                         edit_record(sheet_row, {3: start_dt.strftime('%Y-%m-%d %H:%M'), 6: opm, 7: typ})
 
                 elif record_type == 'Gezondheid':
-                    gewicht = st.number_input('Gewicht (kg)', value=float(record.get('Gewicht', 0.0)), min_value=0.0)
-                    lengte = st.number_input('Lengte (cm)', value=float(record.get('Lengte', 0.0)), min_value=0.0)
-                    temp = st.number_input('Temperatuur (°C)', value=float(record.get('Temperatuur', 0.0)), min_value=0.0)
-                    opm = st.text_area('Opmerkingen / ziekten', record.get('Opmerkingen / ziekten', ''))
+                    gewicht = st.number_input('Gewicht (kg)', value=float((record['Gewicht'] if 'Gewicht' in record.index else 0.0)), min_value=0.0)
+                    lengte = st.number_input('Lengte (cm)', value=float((record['Lengte'] if 'Lengte' in record.index else 0.0)), min_value=0.0)
+                    temp = st.number_input('Temperatuur (°C)', value=float((record['Temperatuur'] if 'Temperatuur' in record.index else 0.0)), min_value=0.0)
+                    opm = st.text_area('Opmerkingen / ziekten', (record['Opmerkingen / ziekten'] if 'Opmerkingen / ziekten' in record.index else ''))
                     if st.button('Opslaan wijziging gezondheid'):
                         edit_record(sheet_row, {11: gewicht, 12: lengte, 13: temp, 14: opm})
 
@@ -792,6 +964,10 @@ if selected_tab == "Instellingen":
     voeding_default_ml = st.number_input("Standaard hoeveelheid fles (ml)", min_value=0, value=int(inst.get('voeding_default_ml', 100)))
     voeding_default_kolven_ml = st.number_input("Standaard hoeveelheid kolven (ml)", min_value=0, value=int(inst.get('voeding_default_kolven_ml', 10)))
     voeding_default_hapje_gram = st.number_input("Standaard hoeveelheid hapje (gram)", min_value=0, value=int(inst.get('voeding_default_hapje_gram', 50)))
+    kunstvoeding_gram_per_schep = st.number_input(
+        "Gram poeder per schep kunstvoeding", min_value=0.1, step=0.1, value=float(inst.get('kunstvoeding_gram_per_schep', 4.4)),
+        help="Héro: 4,4g per schep. Aptamil: 4,3g. Nutrilon: 4,5g."
+    )
 
     st.subheader("💤 Slaap")
     slaap_default_duur = st.number_input("Standaard slaapduur (minuten)", min_value=0, value=int(inst.get('slaap_default_duur', 60)))
@@ -823,6 +999,7 @@ if selected_tab == "Instellingen":
             'voeding_default_ml': voeding_default_ml,
             'voeding_default_kolven_ml': voeding_default_kolven_ml,
             'voeding_default_hapje_gram': voeding_default_hapje_gram,
+            'kunstvoeding_gram_per_schep': kunstvoeding_gram_per_schep,
             'slaap_default_duur': slaap_default_duur,
             'luier_default_type': luier_default_type,
             'activiteit_default_duur': activiteit_default_duur,

@@ -160,7 +160,7 @@ def get_voorraad_row(productnaam):
         return 0, 0, 'stuks', ''
     r = voorraad[mask].iloc[0]
     actueel = int(pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0)
-    minimum = int(pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0)
+    minimum = int(pd.to_numeric(r.get('Minimum voorraad', 0), errors='coerce') or 0)
     eenheid = r.get('Eenheid', 'stuks')
     variant = r.get('Variant', '')
     return actueel, minimum, eenheid, variant
@@ -332,7 +332,7 @@ if selected_tab == "Dashboard":
         lage_voorraad = []
         for _, r in voorraad.iterrows():
             actueel = int(pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0)
-            minimum = int(pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0)
+            minimum = int(pd.to_numeric(r.get('Minimum voorraad', 0), errors='coerce') or 0)
             if actueel <= minimum:
                 naam = r.get('Productnaam', 'Onbekend')
                 eenheid = r.get('Eenheid', 'stuks')
@@ -585,13 +585,14 @@ if selected_tab == "Voorraad":
         lage_voorraad_items = []
         for _, r in voorraad.iterrows():
             actueel = pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0
-            minimum = pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0
+            minimum = pd.to_numeric(r.get('Minimum voorraad', 0), errors='coerce') or 0
             if minimum > 0 and actueel <= minimum:
                 naam = r.get('Productnaam', 'Onbekend')
                 eenheid = r.get('Eenheid', 'stuks')
                 _, dagen_r, _ = bereken_stats(naam, eenheid, actueel)
                 dagen_str = f", genoeg voor ±{dagen_r} dagen" if dagen_r is not None else ""
                 lage_voorraad_items.append(f"**{naam}** — {actueel:.0f} {eenheid} resterend{dagen_str}")
+        if lage_voorraad_items:
             st.error("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad_items))
 
         # --- Voorraadkaarten ---
@@ -619,7 +620,7 @@ if selected_tab == "Voorraad":
             variant = r.get('Variant', '')
             eenheid = r.get('Eenheid', 'stuks')
             actueel = pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0
-            minimum = pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0
+            minimum = pd.to_numeric(r.get('Minimum voorraad', 0), errors='coerce') or 0
 
             per_dag, dagen_resterend, history = bereken_stats(naam, eenheid, actueel)
 
@@ -632,6 +633,9 @@ if selected_tab == "Voorraad":
                 status_label, dagen_color, bar_color = "🟠 Let op", "#e67e22", "#e67e22"
             else:
                 status_label, dagen_color, bar_color = "🟢 Voldoende", "#7a9e72", "#7a9e72"
+
+            if minimum == 0:
+                st.caption(f"⚠️ Geen minimum ingesteld voor {naam} — stel dit in je Voorraad sheet in voor statusbepaling.")
 
             # Mini staafgrafiek SVG
             bar_max = max(history) if history and max(history) > 0 else 1

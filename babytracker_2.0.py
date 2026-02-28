@@ -633,11 +633,13 @@ if selected_tab == "Voorraad":
                 status_bg, status_color, status_label = "#f0fdf4", "#166534", "Voldoende"
                 card_border, dagen_bg, dagen_color, bar_color = "#efefef", "#f0fdf4", "#166534", "#7a9e72"
 
-            # Progressbar — max is pakgrootte of 2x actueel als minimum onbekend
+            # Progressbar — max is de hoogste bekende voorraad (uit bijvulhistorie) of een zinvolle vaste waarde
             if naam == "Kunstvoeding":
-                max_val = 700
+                # Grootste pak = 2100g (3 pakken), of gebruik actueel*1.2 als dat hoger is
+                max_val = max(2100, actueel)
             elif naam == "Luiers":
-                max_val = 72
+                # Grootste pak = 108 stuks, of gebruik actueel*1.2 als dat hoger is
+                max_val = max(108, actueel)
             else:
                 max_val = max(actueel * 1.5, minimum * 2, 1)
             pct = min(100, actueel / max_val * 100) if max_val > 0 else 0
@@ -696,7 +698,7 @@ if selected_tab == "Voorraad":
     <div style="position:absolute;top:-3px;left:{min_pct:.0f}%;width:1.5px;height:11px;background:#ccc;border-radius:1px;"></div>
   </div>
   <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-bottom:14px;">
-    <span>0</span><span>min. {minimum:.0f}</span><span>{max_val:.0f}</span>
+    <span>0</span><span style="color:{status_color};">min. {minimum:.0f}</span><span>{max_val:.0f}</span>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
     <div style="background:#f8f8f8;border-radius:10px;padding:8px 10px;">

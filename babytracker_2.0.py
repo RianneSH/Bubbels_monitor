@@ -652,29 +652,33 @@ if selected_tab == "Voorraad":
             dagen_str = f"±{dagen_resterend} dagen" if dagen_resterend is not None else "–"
 
             with kaart_cols[i].container(border=True):
-                # Header
-                c1, c2 = st.columns([3, 1])
-                c1.markdown(f"**{label}**")
-                c2.markdown(f"<div style='text-align:right'>{status_label}</div>", unsafe_allow_html=True)
-
-                # Groot getal + grafiek
-                c1, c2 = st.columns([2, 1])
-                c1.metric(
-                    label=f"{eenheid} resterend",
-                    value=f"{actueel:.0f}",
-                    delta=f"min. {minimum:.0f}" if minimum > 0 else None,
-                    delta_color="off"
-                )
-                c2.markdown(
-                    f"<div style='text-align:right'><div style='font-size:10px;color:#aaa;margin-bottom:4px;'>7 dagen</div>"
-                    f"<svg width='{svg_w}' height='{svg_h}'>{bars_svg}</svg></div>",
-                    unsafe_allow_html=True
-                )
-
-                # Stats
-                s1, s2 = st.columns(2)
-                s1.metric("Gemiddeld/dag", per_dag_str)
-                s2.metric("Nog mee", dagen_str)
+                # Header + status + grafiek in één HTML blok zodat uitlijning klopt op mobiel
+                st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+  <div style="font-weight:700;font-size:15px;">{naam}{f' <span style="font-weight:400;color:#888;">· {variant}</span>' if variant else ''}</div>
+  <div style="font-size:13px;white-space:nowrap;margin-left:8px;">{status_label}</div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;">
+  <div>
+    <div style="font-size:11px;color:#888;margin-bottom:2px;">{eenheid} resterend</div>
+    <div style="font-size:38px;font-weight:800;letter-spacing:-1px;line-height:1;">{actueel:.0f}</div>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:10px;color:#aaa;margin-bottom:4px;">7 dagen</div>
+    <svg width="{svg_w}" height="{svg_h}">{bars_svg}</svg>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+  <div>
+    <div style="font-size:11px;color:#888;margin-bottom:2px;">Gemiddeld/dag</div>
+    <div style="font-size:18px;font-weight:700;">{per_dag_str}</div>
+  </div>
+  <div>
+    <div style="font-size:11px;color:#888;margin-bottom:2px;">Nog mee</div>
+    <div style="font-size:18px;font-weight:700;color:{dagen_color};">{dagen_str}</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
         st.caption("Schatting gebaseerd op gemiddeld verbruik afgelopen 7 dagen")
         st.divider()

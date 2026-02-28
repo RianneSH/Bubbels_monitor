@@ -596,6 +596,24 @@ if selected_tab == "Voorraad":
             st.error("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad_items))
 
         # --- Voorraadkaarten ---
+        # Responsive wrapper: naast elkaar op desktop, onder elkaar op mobiel
+        st.markdown("""
+        <style>
+        div[data-testid="stHorizontalBlock"]:has(div[data-testid="stVerticalBlockBorderWrapper"]) {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0;
+        }
+        @media (max-width: 640px) {
+            div[data-testid="stHorizontalBlock"]:has(div[data-testid="stVerticalBlockBorderWrapper"]) > div {
+                width: 100% !important;
+                flex: 0 0 100% !important;
+                min-width: 100% !important;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         kaart_cols = st.columns(len(voorraad))
         for i, (_, r) in enumerate(voorraad.iterrows()):
             naam = r.get('Productnaam', 'Onbekend')

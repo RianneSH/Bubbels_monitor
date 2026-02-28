@@ -592,7 +592,6 @@ if selected_tab == "Voorraad":
                 _, dagen_r, _ = bereken_stats(naam, eenheid, actueel)
                 dagen_str = f", genoeg voor ±{dagen_r} dagen" if dagen_r is not None else ""
                 lage_voorraad_items.append(f"**{naam}** — {actueel:.0f} {eenheid} resterend{dagen_str}")
-        if lage_voorraad_items:
             st.error("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad_items))
 
         # --- Voorraadkaarten ---
@@ -625,7 +624,7 @@ if selected_tab == "Voorraad":
             per_dag, dagen_resterend, history = bereken_stats(naam, eenheid, actueel)
 
             is_laag = minimum > 0 and actueel <= minimum
-            is_waarschuwing = not is_laag and minimum > 0 and actueel <= minimum * 1.5
+            is_waarschuwing = not is_laag and minimum > 0 and actueel <= minimum * 1.2
 
             if is_laag:
                 status_label, dagen_color, bar_color = "🔴 Laag", "#e74c3c", "#e74c3c"

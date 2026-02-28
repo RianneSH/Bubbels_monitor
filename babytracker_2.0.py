@@ -665,7 +665,7 @@ if selected_tab == "Voorraad":
             if naam == "Kunstvoeding":
                 snelkeuze_opties = [("1 pak (700g)", 700), ("2 pakken", 1400), ("3 pakken", 2100)]
             elif naam == "Luiers":
-                snelkeuze_opties = [("Klein pak (44)", 44), ("Groot pak (72)", 72)]
+                snelkeuze_opties = [("Midi pak (48)", 48), ("Groot pak (108)", 108)]
             else:
                 snelkeuze_opties = []
 
@@ -698,7 +698,7 @@ if selected_tab == "Voorraad":
   <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-bottom:14px;">
     <span>0</span><span>min. {minimum:.0f}</span><span>{max_val:.0f}</span>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
     <div style="background:#f8f8f8;border-radius:10px;padding:8px 10px;">
       <div style="font-size:10px;color:#aaa;margin-bottom:1px;">Gemiddeld/dag</div>
       <div style="font-weight:700;font-size:14px;color:#1a1a1a;">{per_dag_html} <span style="font-weight:400;font-size:11px;color:#aaa;">{eenheid}</span></div>
@@ -711,19 +711,29 @@ if selected_tab == "Voorraad":
 </div>
 """, unsafe_allow_html=True)
 
-            # Bijvulknoppen onder de kaart (Streamlit native voor interactiviteit)
-            if snelkeuze_opties:
-                kaart_cols[i].caption("Bijvullen")
-                btn_cols = kaart_cols[i].columns(len(snelkeuze_opties))
-                for j, (label, waarde) in enumerate(snelkeuze_opties):
-                    if btn_cols[j].button(f"+ {label}", key=f'bijvul_{naam}_{j}', use_container_width=True):
-                        update_voorraad(naam, waarde)
-                        log_bijvulling(naam, waarde)
-                        st.toast(f"{naam} bijgevuld met {waarde} {eenheid} ✅")
-                        st.cache_data.clear()
-                        st.rerun()
-
         st.caption("Schatting gebaseerd op gemiddeld verbruik afgelopen 7 dagen")
+        st.divider()
+
+        # --- Bijvullen snelkeuze ---
+        st.subheader("📥 Bijvullen")
+        bijvul_cols = st.columns(len(voorraad))
+        for i, (_, r) in enumerate(voorraad.iterrows()):
+            naam = r.get('Productnaam', 'Onbekend')
+            eenheid = r.get('Eenheid', 'stuks')
+            if naam == "Kunstvoeding":
+                snelkeuze_opties = [("1 pak (700g)", 700), ("2 pakken (1400g)", 1400), ("3 pakken (2100g)", 2100)]
+            elif naam == "Luiers":
+                snelkeuze_opties = [("Midi pak (48)", 48), ("Groot pak (108)", 108)]
+            else:
+                snelkeuze_opties = []
+            bijvul_cols[i].markdown(f"**{naam}**")
+            for j, (label, waarde) in enumerate(snelkeuze_opties):
+                if bijvul_cols[i].button(f"+ {label}", key=f'bijvul_{naam}_{j}', use_container_width=True):
+                    update_voorraad(naam, waarde)
+                    log_bijvulling(naam, waarde)
+                    st.toast(f"{naam} bijgevuld met {waarde} {eenheid} ✅")
+                    st.cache_data.clear()
+                    st.rerun()
 
         # --- Aangepaste hoeveelheid bijvullen ---
         st.divider()

@@ -236,7 +236,7 @@ def edit_record(row_index, updates, rerun=False):
 # Sidebar menu
 # ------------------------------
 TAB_NAMES = ["Dashboard", "Slaap", "Voeding", "Luiers", "Gezondheid", "Activiteiten", "Voorraad", "Analyse", "Data", "Bewerk records", "Instellingen"]
-TAB_ICONS = ["house", "moon", "cup-straw", "droplet", "heart", "balloon", "box", "graph-up", "table", "pencil", "gear"]
+TAB_ICONS = ["house", "moon", "cup-straw", "droplet", "heart", "balloon", "cart", "graph-up", "table", "pencil", "gear"]
 
 if "selected_tab" not in st.session_state:
     st.session_state.selected_tab = "Dashboard"
@@ -575,7 +575,7 @@ if selected_tab == "Voorraad":
             except Exception as e:
                 st.error(f"Kon bijvulling niet loggen: {e}")
 
-    st.title("📦 Voorraad")
+    st.title("🛒 Voorraad")
     st.caption("Gebaseerd op verbruik afgelopen 7 dagen")
 
     if voorraad.empty:

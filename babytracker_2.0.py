@@ -524,29 +524,91 @@ if selected_tab == "Activiteiten":
 # TAB: Voorraad
 # ------------------------------
 if selected_tab == "Voorraad":
-    st.title("📦 Voorraad")
+
+    STANDAARD_FLESSEN = [(65, 2), (100, 3), (135, 4), (165, 5), (200, 6)]
+    gram_per_schep = float(inst.get('kunstvoeding_gram_per_schep', 4.4))
+
+    def bereken_stats(naam, eenheid, actueel):
+        """Bereken per_dag en dagen_resterend op basis van verbruik afgelopen 7 dagen."""
+        per_dag = None
+        dagen_resterend = None
+        history = []  # verbruik per dag laatste 7 dagen
+
+        if naam == "Kunstvoeding" and not baby_records.empty:
+            for d in range(6, -1, -1):
+                dag = date.today() - timedelta(days=d)
+                dag_df = baby_records[
+                    (baby_records['Type'] == 'Voeding') &
+                    (baby_records['Voeding_type'] == 'Fles') &
+                    (baby_records['Starttijd'].dt.date == dag)
+                ]
+                gram_dag = sum(
+                    next((s for ev, s in STANDAARD_FLESSEN if ev >= row['Hoeveelheid']), 6) * gram_per_schep
+                    for _, row in dag_df.iterrows()
+                ) if not dag_df.empty else 0
+                history.append(round(gram_dag, 1))
+            totaal = sum(history)
+            if totaal > 0:
+                per_dag = round(totaal / 7, 1)
+                dagen_resterend = int(actueel / per_dag)
+
+        elif naam == "Luiers" and not baby_records.empty:
+            for d in range(6, -1, -1):
+                dag = date.today() - timedelta(days=d)
+                dag_df = baby_records[
+                    (baby_records['Type'] == 'Luier') &
+                    (baby_records['Starttijd'].dt.date == dag)
+                ]
+                history.append(len(dag_df))
+            totaal = sum(history)
+            if totaal > 0:
+                per_dag = round(totaal / 7, 1)
+                dagen_resterend = int(actueel / per_dag)
+
+        return per_dag, dagen_resterend, history
+
+    def log_bijvulling(productnaam, hoeveelheid):
+        if sheet_bijvulling:
+            try:
+                sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), productnaam, hoeveelheid])
+            except Exception as e:
+                st.error(f"Kon bijvulling niet loggen: {e}")
+
+    st.markdown("""
+    <div style="margin-bottom:4px;">
+        <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;">📦 Voorraad</span>
+    </div>
+    <div style="font-size:12px;color:#bbb;margin-bottom:20px;">Gebaseerd op verbruik afgelopen 7 dagen</div>
+    """, unsafe_allow_html=True)
 
     if voorraad.empty:
         st.info('Geen voorraaddata beschikbaar. Controleer je Google Sheet.')
     else:
         # --- Lage voorraad banner ---
-        lage_voorraad = []
+        lage_voorraad_items = []
         for _, r in voorraad.iterrows():
             actueel = pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0
             minimum = pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0
             if actueel <= minimum:
                 naam = r.get('Productnaam', 'Onbekend')
                 eenheid = r.get('Eenheid', 'stuks')
-                variant = r.get('Variant', '')
-                label = naam + (f" ({variant})" if variant else "")
-                lage_voorraad.append(f"**{label}** — nog {actueel:.0f} {eenheid}")
-        if lage_voorraad:
-            st.error("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad))
+                _, dagen_r, _ = bereken_stats(naam, eenheid, actueel)
+                dagen_str = f", genoeg voor ±{dagen_r} dagen" if dagen_r is not None else ""
+                lage_voorraad_items.append(f"{naam} — {actueel:.0f} {eenheid} resterend{dagen_str}")
+
+        if lage_voorraad_items:
+            items_html = "".join(f'<div style="font-size:12px;color:#b42318;margin-top:2px;">{item}</div>' for item in lage_voorraad_items)
+            st.markdown(f"""
+<div style="background:#fef3f2;border:1px solid #fecdca;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;gap:10px;">
+  <span style="font-size:18px;margin-top:1px;">⚠️</span>
+  <div>
+    <div style="font-weight:700;color:#b42318;font-size:13px;">Lage voorraad</div>
+    {items_html}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
         # --- Voorraadkaarten ---
-        STANDAARD_FLESSEN = [(65, 2), (100, 3), (135, 4), (165, 5), (200, 6)]
-        gram_per_schep = float(inst.get('kunstvoeding_gram_per_schep', 4.4))
-
         kaart_cols = st.columns(len(voorraad))
         for i, (_, r) in enumerate(voorraad.iterrows()):
             naam = r.get('Productnaam', 'Onbekend')
@@ -555,196 +617,172 @@ if selected_tab == "Voorraad":
             actueel = pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0
             minimum = pd.to_numeric(r.get('Minimale voorraad', 0), errors='coerce') or 0
 
-            # Bereken verbruik per dag + dagen resterend
-            per_dag = None
-            dagen_resterend = None
+            per_dag, dagen_resterend, history = bereken_stats(naam, eenheid, actueel)
 
-            if naam == "Kunstvoeding" and not baby_records.empty:
-                kv_df = baby_records[
-                    (baby_records['Type'] == 'Voeding') &
-                    (baby_records['Voeding_type'] == 'Fles') &
-                    (baby_records['Starttijd'] >= pd.Timestamp.now() - pd.Timedelta(days=7))
-                ].copy()
-                if not kv_df.empty:
-                    totaal_gram_7d = sum(
-                        next((s for ev, s in STANDAARD_FLESSEN if ev >= row['Hoeveelheid']), 6) * gram_per_schep
-                        for _, row in kv_df.iterrows()
-                    )
-                    per_dag = round(totaal_gram_7d / 7, 1)
-                    if per_dag > 0:
-                        dagen_resterend = int(actueel / per_dag)
-
-            elif naam == "Luiers" and not baby_records.empty:
-                luier_7d = baby_records[
-                    (baby_records['Type'] == 'Luier') &
-                    (baby_records['Starttijd'] >= pd.Timestamp.now() - pd.Timedelta(days=7))
-                ]
-                if not luier_7d.empty:
-                    per_dag = round(len(luier_7d) / 7, 1)
-                    if per_dag > 0:
-                        dagen_resterend = int(actueel / per_dag)
-
-            # Kleur bepalen
             is_laag = actueel <= minimum
-            is_waarschuwing = actueel <= minimum * 1.5
+            is_waarschuwing = not is_laag and actueel <= minimum * 1.5
 
             if is_laag:
-                status_bg = "#fef3f2"; status_color = "#b42318"; status_label = "● Laag"
-                card_border = "#fecdca"; dagen_bg = "#fef3f2"; dagen_color = "#b42318"
+                status_bg, status_color, status_label = "#fef3f2", "#b42318", "Laag"
+                card_border, dagen_bg, dagen_color, bar_color = "#fecdca", "#fef3f2", "#b42318", "#e74c3c"
             elif is_waarschuwing:
-                status_bg = "#fffaeb"; status_color = "#b54708"; status_label = "● Let op"
-                card_border = "#e8e8e8"; dagen_bg = "#fffaeb"; dagen_color = "#b54708"
+                status_bg, status_color, status_label = "#fffaeb", "#b54708", "Let op"
+                card_border, dagen_bg, dagen_color, bar_color = "#e8e8e8", "#fffaeb", "#b54708", "#e67e22"
             else:
-                status_bg = "#f0fdf4"; status_color = "#166534"; status_label = "● Voldoende"
-                card_border = "#e8e8e8"; dagen_bg = "#f0fdf4"; dagen_color = "#166534"
+                status_bg, status_color, status_label = "#f0fdf4", "#166534", "Voldoende"
+                card_border, dagen_bg, dagen_color, bar_color = "#efefef", "#f0fdf4", "#166534", "#7a9e72"
 
-            # Progressbar berekening
-            max_val = actueel * 2 if actueel > minimum else minimum * 3
-            pct = min(100, (actueel / max_val * 100)) if max_val > 0 else 0
-            min_pct = min(100, (minimum / max_val * 100)) if max_val > 0 else 0
-            bar_color = "#e74c3c" if is_laag else ("#e67e22" if is_waarschuwing else "#7a9e72")
+            # Progressbar
+            max_val = max(actueel * 1.5, minimum * 2, 1)
+            pct = min(100, actueel / max_val * 100)
+            min_pct = min(100, minimum / max_val * 100)
+
+            # Mini staafgrafiek SVG
+            bar_max = max(history) if history and max(history) > 0 else 1
+            bar_w = 6
+            bar_gap = 3
+            svg_w = len(history) * (bar_w + bar_gap) - bar_gap
+            svg_h = 28
+            bars_svg = ""
+            for j, v in enumerate(history):
+                h = max(2, int((v / bar_max) * svg_h))
+                x = j * (bar_w + bar_gap)
+                fill = bar_color if j == len(history) - 1 else bar_color + "66"
+                bars_svg += f'<rect x="{x}" y="{svg_h - h}" width="{bar_w}" height="{h}" rx="2" fill="{fill}"/>'
 
             icon = "🧷" if naam == "Luiers" else "🍼"
-            variant_html = f'<div style="font-size:12px;color:#aaa;">{variant}</div>' if variant else ''
+            variant_html = f'<div style="font-size:11px;color:#bbb;margin-top:1px;">{variant}</div>' if variant else ''
             per_dag_html = f'{per_dag}' if per_dag is not None else '–'
-            dagen_html = f'±{dagen_resterend} <span style="font-weight:400;font-size:12px;">dagen</span>' if dagen_resterend is not None else '–'
+            dagen_html = f'±{dagen_resterend} <span style="font-weight:400;font-size:11px;">dagen</span>' if dagen_resterend is not None else '–'
+
+            # Bijvulknoppen HTML
+            if naam == "Kunstvoeding":
+                snelkeuze_opties = [("1 pak (700g)", 700), ("2 pakken", 1400), ("3 pakken", 2100)]
+            elif naam == "Luiers":
+                snelkeuze_opties = [("Klein pak (44)", 44), ("Groot pak (72)", 72)]
+            else:
+                snelkeuze_opties = []
 
             kaart_cols[i].markdown(f"""
-<div style="background:#fff;border:1px solid {card_border};border-radius:18px;padding:20px 22px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+<div style="background:#fff;border:1.5px solid {card_border};border-radius:20px;padding:20px 20px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.04);">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:22px;">{icon}</span>
+      <span style="font-size:22px;line-height:1;">{icon}</span>
       <div>
-        <div style="font-weight:700;font-size:15px;">{naam}</div>
+        <div style="font-weight:800;font-size:14px;line-height:1.2;">{naam}</div>
         {variant_html}
       </div>
     </div>
-    <span style="background:{status_bg};color:{status_color};font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{status_label}</span>
+    <span style="background:{status_bg};color:{status_color};font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;letter-spacing:0.3px;text-transform:uppercase;">{status_label}</span>
   </div>
-  <div style="margin:14px 0 0;">
-    <span style="font-size:34px;font-weight:700;letter-spacing:-1px;">{actueel:.0f}</span>
-    <span style="font-size:14px;color:#888;margin-left:6px;">{eenheid}</span>
-  </div>
-  <div style="position:relative;background:#f0f0f0;border-radius:99px;height:6px;margin:12px 0 6px;">
-    <div style="width:{pct:.0f}%;background:{bar_color};height:6px;border-radius:99px;"></div>
-  </div>
-  <div style="display:flex;justify-content:space-between;font-size:11px;color:#bbb;margin-bottom:14px;">
-    <span>0</span><span>min. {minimum:.0f}</span><span>{actueel:.0f}</span>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-    <div style="background:#f8f8f8;border-radius:10px;padding:10px 12px;">
-      <div style="font-size:11px;color:#aaa;margin-bottom:2px;">Per dag</div>
-      <div style="font-weight:700;font-size:15px;">{per_dag_html} <span style="font-weight:400;font-size:12px;color:#888;">{eenheid}</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;">
+    <div>
+      <div style="font-size:36px;font-weight:800;letter-spacing:-2px;line-height:1;">{actueel:.0f}</div>
+      <div style="font-size:12px;color:#bbb;margin-top:2px;">{eenheid} resterend</div>
     </div>
-    <div style="background:{dagen_bg};border-radius:10px;padding:10px 12px;">
-      <div style="font-size:11px;color:#aaa;margin-bottom:2px;">Nog mee</div>
-      <div style="font-weight:700;font-size:15px;color:{dagen_color};">{dagen_html}</div>
+    <div>
+      <div style="font-size:10px;color:#ccc;margin-bottom:4px;text-align:right;">7 dagen</div>
+      <svg width="{svg_w}" height="{svg_h}">{bars_svg}</svg>
+    </div>
+  </div>
+  <div style="position:relative;background:#f3f3f3;border-radius:99px;height:5px;margin:10px 0 4px;">
+    <div style="width:{pct:.0f}%;background:{bar_color};height:5px;border-radius:99px;"></div>
+    <div style="position:absolute;top:-3px;left:{min_pct:.0f}%;width:1.5px;height:11px;background:#ccc;border-radius:1px;"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:10px;color:#ccc;margin-bottom:14px;">
+    <span>0</span><span>min. {minimum:.0f}</span><span>{max_val:.0f}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;">
+    <div style="background:#f8f8f8;border-radius:10px;padding:8px 10px;">
+      <div style="font-size:10px;color:#bbb;margin-bottom:1px;">Gemiddeld/dag</div>
+      <div style="font-weight:700;font-size:14px;">{per_dag_html} <span style="font-weight:400;font-size:11px;color:#bbb;">{eenheid}</span></div>
+    </div>
+    <div style="background:{dagen_bg};border-radius:10px;padding:8px 10px;">
+      <div style="font-size:10px;color:#bbb;margin-bottom:1px;">Nog mee</div>
+      <div style="font-weight:700;font-size:14px;color:{dagen_color};">{dagen_html}</div>
     </div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
+            # Bijvulknoppen onder de kaart (Streamlit native voor interactiviteit)
+            if snelkeuze_opties:
+                kaart_cols[i].caption("Bijvullen")
+                btn_cols = kaart_cols[i].columns(len(snelkeuze_opties))
+                for j, (label, waarde) in enumerate(snelkeuze_opties):
+                    if btn_cols[j].button(f"+ {label}", key=f'bijvul_{naam}_{j}', use_container_width=True):
+                        update_voorraad(naam, waarde)
+                        log_bijvulling(naam, waarde)
+                        st.toast(f"{naam} bijgevuld met {waarde} {eenheid} ✅")
+                        st.cache_data.clear()
+                        st.rerun()
+
         st.caption("Schatting gebaseerd op gemiddeld verbruik afgelopen 7 dagen")
+
+        # --- Aangepaste hoeveelheid bijvullen ---
         st.divider()
-
-        # --- Bijvullen ---
-        st.subheader("📥 Bijvullen")
+        st.subheader("➕ Aangepast bijvullen")
         prod_namen = voorraad['Productnaam'].tolist()
-        prod_to_add = st.pills("Product", prod_namen, key='p_add')
+        ac1, ac2, ac3 = st.columns([2, 2, 1])
+        with ac1:
+            prod_to_add = st.selectbox('Product', prod_namen, key='p_add', label_visibility='collapsed')
+        with ac2:
+            eenheid_add = voorraad.loc[voorraad['Productnaam'] == prod_to_add, 'Eenheid'].values[0]
+            aantal_to_add = st.number_input(f'Hoeveelheid ({eenheid_add})', min_value=0.0, step=1.0, value=1.0, key='a_add', label_visibility='collapsed')
+        with ac3:
+            st.write("")
+            if st.button('Toevoegen', key='add_stock', use_container_width=True):
+                update_voorraad(prod_to_add, float(aantal_to_add))
+                log_bijvulling(prod_to_add, aantal_to_add)
+                st.toast(f'{prod_to_add} bijgevuld ✅')
+                st.cache_data.clear()
+                st.rerun()
 
-        if prod_to_add:
-            eenheid_add = voorraad.loc[voorraad['Productnaam'] == prod_to_add, 'Eenheid'].values[0] if not voorraad.empty else 'stuks'
-
-            # Snelknoppen voor kunstvoeding (pak van 700g)
-            if prod_to_add == "Kunstvoeding":
-                st.caption("Snelkeuze")
-                qcol1, qcol2, qcol3 = st.columns(3)
-                if qcol1.button("➕ 1 pak (700g)", key='kv_1pak'):
-                    update_voorraad("Kunstvoeding", 700)
-                    if sheet_bijvulling:
-                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Kunstvoeding", 700])
-                    st.toast("700g kunstvoeding toegevoegd ✅")
-                    st.cache_data.clear()
-                    st.rerun()
-                if qcol2.button("➕ 2 pakken (1400g)", key='kv_2pak'):
-                    update_voorraad("Kunstvoeding", 1400)
-                    if sheet_bijvulling:
-                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Kunstvoeding", 1400])
-                    st.toast("1400g kunstvoeding toegevoegd ✅")
-                    st.cache_data.clear()
-                    st.rerun()
-                if qcol3.button("➕ 3 pakken (2100g)", key='kv_3pak'):
-                    update_voorraad("Kunstvoeding", 2100)
-                    if sheet_bijvulling:
-                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Kunstvoeding", 2100])
-                    st.toast("2100g kunstvoeding toegevoegd ✅")
-                    st.cache_data.clear()
-                    st.rerun()
-
-            # Snelknoppen voor luiers (per pak)
-            if prod_to_add == "Luiers":
-                st.caption("Snelkeuze")
-                qcol1, qcol2 = st.columns(2)
-                if qcol1.button("➕ Klein pak (~44 stuks)", key='l_klein'):
-                    update_voorraad("Luiers", 44)
-                    if sheet_bijvulling:
-                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Luiers", 44])
-                    st.toast("44 luiers toegevoegd ✅")
-                    st.cache_data.clear()
-                    st.rerun()
-                if qcol2.button("➕ Groot pak (~72 stuks)", key='l_groot'):
-                    update_voorraad("Luiers", 72)
-                    if sheet_bijvulling:
-                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), "Luiers", 72])
-                    st.toast("72 luiers toegevoegd ✅")
-                    st.cache_data.clear()
-                    st.rerun()
-
-            st.caption("Aangepaste hoeveelheid")
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                aantal_to_add = st.number_input(f'Aantal ({eenheid_add})', min_value=0.0, step=1.0, value=1.0, key='a_add', label_visibility="collapsed")
-            with col2:
-                st.write("")
-                if st.button('➕ Toevoegen', key='add_stock', use_container_width=True):
-                    update_voorraad(prod_to_add, float(aantal_to_add))
-                    if sheet_bijvulling:
-                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), prod_to_add, aantal_to_add])
-                    st.toast(f'{prod_to_add} bijgevuld met {aantal_to_add} {eenheid_add} ✅')
-                    st.cache_data.clear()
-                    st.rerun()
-
-        # --- Handmatige correctie ---
+        # --- Correctie ---
         st.divider()
         st.subheader("🔧 Voorraad corrigeren")
         st.caption("Gebruik dit als de werkelijke voorraad afwijkt van wat de app bijhoudt.")
-        prod_cor = st.pills("Product", prod_namen, key='p_cor')
-        if prod_cor:
+        cc1, cc2, cc3 = st.columns([2, 2, 1])
+        with cc1:
+            prod_cor = st.selectbox('Product', prod_namen, key='p_cor', label_visibility='collapsed')
+        with cc2:
             eenheid_cor = voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Eenheid'].values[0]
             huidige_waarde = float(pd.to_numeric(voorraad.loc[voorraad['Productnaam'] == prod_cor, 'Actuele voorraad'].values[0], errors='coerce') or 0)
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                nieuwe_waarde = st.number_input(f'Werkelijke voorraad ({eenheid_cor})', min_value=0.0, step=1.0, value=huidige_waarde, key='v_cor')
-            with col2:
-                st.write("")
-                if st.button('💾 Opslaan', key='cor_stock', use_container_width=True):
-                    verschil = nieuwe_waarde - huidige_waarde
-                    update_voorraad(prod_cor, verschil)
-                    if sheet_bijvulling:
-                        sheet_bijvulling.append_row([datetime.now().strftime('%Y-%m-%d %H:%M'), f"{prod_cor} (correctie)", verschil])
-                    st.toast(f'Voorraad {prod_cor} gecorrigeerd naar {nieuwe_waarde:.0f} {eenheid_cor} ✅')
-                    st.cache_data.clear()
-                    st.rerun()
+            nieuwe_waarde = st.number_input(f'Werkelijke waarde ({eenheid_cor})', min_value=0.0, step=1.0, value=huidige_waarde, key='v_cor', label_visibility='collapsed')
+        with cc3:
+            st.write("")
+            if st.button('Opslaan', key='cor_stock', use_container_width=True):
+                verschil = nieuwe_waarde - huidige_waarde
+                update_voorraad(prod_cor, verschil)
+                log_bijvulling(f"{prod_cor} (correctie)", verschil)
+                st.toast(f'Voorraad {prod_cor} gecorrigeerd naar {nieuwe_waarde:.0f} {eenheid_cor} ✅')
+                st.cache_data.clear()
+                st.rerun()
 
+        # --- Bijvulhistorie ---
         st.divider()
-
-        # --- Verbruikshistorie ---
         if not bijvullingen.empty:
-            with st.expander("📈 Bijvulhistorie"):
+            with st.expander("📋 Bijvulhistorie"):
                 bv_df = bijvullingen.copy()
                 bv_df['Datum'] = pd.to_datetime(bv_df['Datum'], errors='coerce')
-                bv_df = bv_df.dropna(subset=['Datum']).sort_values('Datum', ascending=False)
-                st.dataframe(bv_df[['Datum', 'Productnaam', 'Hoeveelheid']].head(20), use_container_width=True)
+                bv_df = bv_df.dropna(subset=['Datum']).sort_values('Datum', ascending=False).head(20)
+                for _, row in bv_df.iterrows():
+                    datum_str = row['Datum'].strftime('%d %b %H:%M')
+                    prod = row.get('Productnaam', '')
+                    hoev = row.get('Hoeveelheid', '')
+                    is_cor = '(correctie)' in str(prod)
+                    kleur = "#888" if is_cor else "#7a9e72"
+                    teken = "±" if is_cor else "+"
+                    st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f5;">
+  <span style="font-size:12px;color:#bbb;width:100px;">{datum_str}</span>
+  <span style="font-size:13px;font-weight:600;flex:1;">{prod}</span>
+  <span style="font-size:13px;font-weight:700;color:{kleur};">{teken}{hoev}</span>
+</div>""", unsafe_allow_html=True)
+        else:
+            with st.expander("📋 Bijvulhistorie"):
+                st.info("Nog geen bijvullingen geregistreerd.")
+
 
 
 # ------------------------------

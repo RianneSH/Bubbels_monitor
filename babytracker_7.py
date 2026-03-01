@@ -363,10 +363,17 @@ if selected_tab == "Dashboard":
         for _, r in luier_df.iterrows():
             ltype = r.get('Type Luier', 'Luier')
             timeline_items.append(("🧷", r['Starttijd'], f"Luier {ltype.lower()}", "#fdf4ff"))
+    ACTIVITEIT_ICONS = {naam: icon for icon, naam in [
+        ("🐛", "Tummy time"), ("🛁", "Bad"), ("🚿", "Douchen"), ("🚶", "Wandelen"),
+        ("🏊", "Zwemmen"), ("👨‍👩‍👧", "Familie/vrienden"), ("🏥", "CJG/Dokter"),
+        ("🧸", "Speelmat"), ("🧣", "Draagdoek"),
+    ]}
+
     if not act_vandaag.empty:
         for _, r in act_vandaag.iterrows():
             anaam = r.get('Activiteit_type', 'Activiteit') if 'Activiteit_type' in r.index else 'Activiteit'
-            timeline_items.append(("🐛", r['Starttijd'], anaam, "#fff7ed"))
+            aicon = ACTIVITEIT_ICONS.get(anaam, "🎈")
+            timeline_items.append((aicon, r['Starttijd'], anaam, "#fff7ed"))
 
     timeline_items.sort(key=lambda x: x[1], reverse=True)
 

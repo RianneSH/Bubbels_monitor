@@ -382,11 +382,6 @@ if selected_tab == "Dashboard":
 
     # --- Render ---
     st.markdown(f"""
-<style>
-@media (max-width: 640px) {{
-    .dash-grid {{ grid-template-columns: 1fr 1fr !important; }}
-}}
-</style>
 <div style="margin-bottom:20px;">
   <div style="font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1.1;">Bubbel<span style="color:#7a9e72;">.</span></div>
   <div style="font-size:13px;color:#aaa;margin-top:3px;">Dagoverzicht van {baby_naam} · {datum_str}</div>
@@ -409,20 +404,22 @@ if selected_tab == "Dashboard":
     k3, k4 = st.columns(2)
 
     def dash_kaart(col, icon, titel, getal, subtekst, tag_tekst, tag_bg, tag_kleur, laatste=None):
-        laatste_html = f'<span style="font-size:11px;color:#bbb;">{laatste}</span>' if laatste else ''
-        col.markdown(f"""
-<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;height:100%;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <span style="font-size:16px;">{icon}</span>
-      <span style="font-weight:700;font-size:13px;">{titel}</span>
-    </div>
-    {laatste_html}
+        laatste_html = f'<span style="font-size:11px;color:#aaa;">{laatste}</span>' if laatste else ''
+        with col.container(border=True):
+            st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+  <div style="display:flex;align-items:center;gap:6px;">
+    <span style="font-size:16px;">{icon}</span>
+    <span style="font-weight:700;font-size:13px;">{titel}</span>
   </div>
-  <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;margin:6px 0 2px;">{getal}</div>
-  <div style="font-size:11px;color:#aaa;margin-bottom:10px;">{subtekst}</div>
+  {laatste_html}
+</div>
+<div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;margin:4px 0 2px;">{getal}</div>
+<div style="font-size:11px;color:#aaa;margin-bottom:10px;">{subtekst}</div>
+<div style="padding-bottom:10px;">
   <span style="background:{tag_bg};color:{tag_kleur};font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{tag_tekst}</span>
-</div>""", unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
 
     dash_kaart(k1, "💤", "Slaap",
                aantal_slaap, "slaapjes vandaag", slaap_tag,
@@ -436,30 +433,30 @@ if selected_tab == "Dashboard":
                laatste=f"laatste {laatste_voeding}" if laatste_voeding else None)
 
     # Luiers kaart apart (twee getallen)
-    k3.markdown(f"""
-<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;height:100%;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <span style="font-size:16px;">🧷</span>
-      <span style="font-weight:700;font-size:13px;">Luiers</span>
-    </div>
-    <span style="font-size:11px;color:#bbb;">{"laatste " + laatste_luier if laatste_luier else ""}</span>
+    with k3.container(border=True):
+        st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+  <div style="display:flex;align-items:center;gap:6px;">
+    <span style="font-size:16px;">🧷</span>
+    <span style="font-weight:700;font-size:13px;">Luiers</span>
   </div>
-  <div style="display:flex;gap:16px;margin:6px 0 2px;">
-    <div>
-      <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;">{nat_count}</div>
-      <div style="font-size:11px;color:#aaa;">nat</div>
-    </div>
-    <div style="width:1px;background:#f0f0f0;margin:4px 0;"></div>
-    <div>
-      <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;">{vuil_count}</div>
-      <div style="font-size:11px;color:#aaa;">vuil</div>
-    </div>
+  <span style="font-size:11px;color:#aaa;">{"laatste " + laatste_luier if laatste_luier else ""}</span>
+</div>
+<div style="display:flex;gap:16px;margin:4px 0 2px;">
+  <div>
+    <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;">{nat_count}</div>
+    <div style="font-size:11px;color:#aaa;">nat</div>
   </div>
-  <div style="margin-top:10px;">
-    <span style="background:#fdf4ff;color:#7c3aed;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{nat_count + vuil_count} totaal</span>
+  <div style="width:1px;background:#aaa;opacity:0.3;margin:4px 0;"></div>
+  <div>
+    <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;">{vuil_count}</div>
+    <div style="font-size:11px;color:#aaa;">vuil</div>
   </div>
-</div>""", unsafe_allow_html=True)
+</div>
+<div style="padding-bottom:10px;margin-top:10px;">
+  <span style="background:#fdf4ff;color:#7c3aed;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{nat_count + vuil_count} totaal</span>
+</div>
+""", unsafe_allow_html=True)
 
     dash_kaart(k4, "🎈", "Activiteiten",
                aantal_act, "vandaag",
@@ -467,48 +464,43 @@ if selected_tab == "Dashboard":
                "#fff7ed", "#c2410c",
                laatste=f"{laatste_act_tijd}" if laatste_act_tijd else None)
 
-    st.write("")
-
     # Gezondheidskaart
     if gez_datum:
-        st.markdown(f"""
-<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;margin-bottom:12px;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <span style="font-size:16px;">🩺</span>
-      <span style="font-weight:700;font-size:13px;">Gezondheid</span>
-    </div>
-    <span style="font-size:11px;color:#bbb;">meting {gez_datum}</span>
+        with st.container(border=True):
+            st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+  <div style="display:flex;align-items:center;gap:6px;">
+    <span style="font-size:16px;">🩺</span>
+    <span style="font-weight:700;font-size:13px;">Gezondheid</span>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-    <div>
-      <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Gewicht</div>
-      <div style="font-weight:700;font-size:16px;">{gewicht:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">kg</span></div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Lengte</div>
-      <div style="font-weight:700;font-size:16px;">{lengte:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">cm</span></div>
-    </div>
-    <div>
-      <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Temp.</div>
-      <div style="font-weight:700;font-size:16px;">{temp:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">°C</span></div>
-    </div>
+  <span style="font-size:11px;color:#aaa;">meting {gez_datum}</span>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+  <div>
+    <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Gewicht</div>
+    <div style="font-weight:700;font-size:16px;">{gewicht:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">kg</span></div>
   </div>
-</div>""", unsafe_allow_html=True)
+  <div>
+    <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Lengte</div>
+    <div style="font-weight:700;font-size:16px;">{lengte:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">cm</span></div>
+  </div>
+  <div>
+    <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Temp.</div>
+    <div style="font-weight:700;font-size:16px;">{temp:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">°C</span></div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
     # Timeline
     if timeline_html:
-        st.markdown(f"""
-<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;">
-  <div style="font-weight:700;font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px;">Vandaag</div>
-  {timeline_html}
-</div>""", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown(f"""
+<div style="font-weight:700;font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px;">Vandaag</div>
+{timeline_html}
+""", unsafe_allow_html=True)
     else:
-        st.markdown("""
-<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;color:#bbb;font-size:13px;text-align:center;">
-  Nog geen activiteit geregistreerd vandaag
-</div>""", unsafe_allow_html=True)
-
+        with st.container(border=True):
+            st.caption("Nog geen activiteit geregistreerd vandaag")
 
 
 # ------------------------------

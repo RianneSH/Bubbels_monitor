@@ -277,7 +277,8 @@ selected_tab = st.session_state.selected_tab
 if selected_tab == "Dashboard":
     baby_naam = inst.get('baby_naam', 'Bubbel')
     vandaag = date.today()
-    datum_str = vandaag.strftime('%-d %B')
+    MAANDEN_NL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december']
+    datum_str = f"{vandaag.day} {MAANDEN_NL[vandaag.month - 1]}"
 
     # --- Data ophalen ---
     slaap_df = baby_records[(baby_records['Type'] == 'Slaap') & (baby_records['Starttijd'].dt.date == vandaag)] if not baby_records.empty else pd.DataFrame()
@@ -406,6 +407,13 @@ if selected_tab == "Dashboard":
     # Kaarten 2x2
     k1, k2 = st.columns(2)
     k3, k4 = st.columns(2)
+    st.markdown("""
+    <style>
+    div[data-testid="stHorizontalBlock"] + div[data-testid="stHorizontalBlock"] {
+        margin-top: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     def dash_kaart(col, icon, titel, getal, subtekst, tag_tekst, tag_bg, tag_kleur, laatste=None):
         laatste_html = f'<span style="font-size:11px;color:#bbb;">{laatste}</span>' if laatste else ''

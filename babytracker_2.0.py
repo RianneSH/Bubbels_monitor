@@ -416,7 +416,7 @@ if selected_tab == "Dashboard":
 </div>
 <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;margin:4px 0 2px;">{getal}</div>
 <div style="font-size:11px;color:#aaa;margin-bottom:10px;">{subtekst}</div>
-<div style="padding-bottom:4px;">
+<div style="padding-bottom:10px;">
   <span style="background:{tag_bg};color:{tag_kleur};font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{tag_tekst}</span>
 </div>
 """, unsafe_allow_html=True)
@@ -453,7 +453,7 @@ if selected_tab == "Dashboard":
     <div style="font-size:11px;color:#aaa;">vuil</div>
   </div>
 </div>
-<div style="padding-bottom:4px;margin-top:10px;">
+<div style="padding-bottom:10px;margin-top:10px;">
   <span style="background:#fdf4ff;color:#7c3aed;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{nat_count + vuil_count} totaal</span>
 </div>
 """, unsafe_allow_html=True)
@@ -463,8 +463,6 @@ if selected_tab == "Dashboard":
                laatste_act_naam if laatste_act_naam != '–' else "–",
                "#fff7ed", "#c2410c",
                laatste=f"{laatste_act_tijd}" if laatste_act_tijd else None)
-
-    st.write("")
 
     # Gezondheidskaart
     if gez_datum:

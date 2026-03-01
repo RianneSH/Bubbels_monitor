@@ -382,53 +382,6 @@ if selected_tab == "Dashboard":
 
     # --- Render ---
     st.markdown(f"""
-<style>
-@media (max-width: 640px) {{
-    .dash-grid {{ grid-template-columns: 1fr 1fr !important; }}
-}}
-.dash-kaart {{
-    border: 1.5px solid var(--dk-border, #efefef);
-    border-radius: 18px;
-    padding: 16px 18px;
-    height: 100%;
-}}
-.dash-kaart .dk-titel {{ font-weight: 700; font-size: 13px; color: var(--dk-tekst, #1a1a1a); }}
-.dash-kaart .dk-getal {{ font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; margin: 6px 0 2px; color: var(--dk-tekst, #1a1a1a); }}
-.dash-kaart .dk-sub   {{ font-size: 11px; color: var(--dk-sub, #aaa); margin-bottom: 10px; }}
-.dash-kaart .dk-tijd  {{ font-size: 11px; color: var(--dk-sub, #bbb); }}
-.dash-kaart .dk-scheidslijn {{ width: 1px; background: var(--dk-border, #f0f0f0); margin: 4px 0; }}
-</style>
-<script>
-(function() {{
-    function applyTheme() {{
-        var bg = getComputedStyle(document.documentElement).getPropertyValue('--background-color').trim();
-        var isDark = false;
-        if (bg) {{
-            var hex = bg.replace('#','');
-            if (hex.length === 3) hex = hex.split('').map(function(c){{return c+c;}}).join('');
-            var r = parseInt(hex.substr(0,2),16);
-            var g = parseInt(hex.substr(2,2),16);
-            var b = parseInt(hex.substr(4,2),16);
-            isDark = (0.299*r + 0.587*g + 0.114*b) / 255 < 0.5;
-        }}
-        var root = document.documentElement;
-        if (isDark) {{
-            root.style.setProperty('--dk-border', '#333333');
-            root.style.setProperty('--dk-tekst',  '#f0f0f0');
-            root.style.setProperty('--dk-sub',    '#666666');
-        }} else {{
-            root.style.setProperty('--dk-border', '#efefef');
-            root.style.setProperty('--dk-tekst',  '#1a1a1a');
-            root.style.setProperty('--dk-sub',    '#aaaaaa');
-        }}
-    }}
-    applyTheme();
-    var observer = new MutationObserver(applyTheme);
-    observer.observe(document.documentElement, {{ attributes: true, attributeFilter: ['data-theme'] }});
-    var checks = 0;
-    var interval = setInterval(function() {{ applyTheme(); if (++checks >= 5) clearInterval(interval); }}, 1000);
-}})();
-</script>
 <div style="margin-bottom:20px;">
   <div style="font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1.1;">Bubbel<span style="color:#7a9e72;">.</span></div>
   <div style="font-size:13px;color:#aaa;margin-top:3px;">Dagoverzicht van {baby_naam} · {datum_str}</div>
@@ -451,20 +404,20 @@ if selected_tab == "Dashboard":
     k3, k4 = st.columns(2)
 
     def dash_kaart(col, icon, titel, getal, subtekst, tag_tekst, tag_bg, tag_kleur, laatste=None):
-        laatste_html = f'<span class="dk-tijd">{laatste}</span>' if laatste else ''
-        col.markdown(f"""
-<div class="dash-kaart">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <span style="font-size:16px;">{icon}</span>
-      <span class="dk-titel">{titel}</span>
-    </div>
-    {laatste_html}
+        laatste_html = f'<span style="font-size:11px;color:#aaa;">{laatste}</span>' if laatste else ''
+        with col.container(border=True):
+            st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+  <div style="display:flex;align-items:center;gap:6px;">
+    <span style="font-size:16px;">{icon}</span>
+    <span style="font-weight:700;font-size:13px;">{titel}</span>
   </div>
-  <div class="dk-getal">{getal}</div>
-  <div class="dk-sub">{subtekst}</div>
-  <span style="background:{tag_bg};color:{tag_kleur};font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{tag_tekst}</span>
-</div>""", unsafe_allow_html=True)
+  {laatste_html}
+</div>
+<div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;margin:4px 0 2px;">{getal}</div>
+<div style="font-size:11px;color:#aaa;margin-bottom:10px;">{subtekst}</div>
+<span style="background:{tag_bg};color:{tag_kleur};font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{tag_tekst}</span>
+""", unsafe_allow_html=True)
 
     dash_kaart(k1, "💤", "Slaap",
                aantal_slaap, "slaapjes vandaag", slaap_tag,
@@ -478,30 +431,30 @@ if selected_tab == "Dashboard":
                laatste=f"laatste {laatste_voeding}" if laatste_voeding else None)
 
     # Luiers kaart apart (twee getallen)
-    k3.markdown(f"""
-<div class="dash-kaart" style="border-radius:18px;padding:16px 18px;height:100%;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <span style="font-size:16px;">🧷</span>
-      <span class="dk-titel">Luiers</span>
-    </div>
-    <span class="dk-tijd">{"laatste " + laatste_luier if laatste_luier else ""}</span>
+    with k3.container(border=True):
+        st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+  <div style="display:flex;align-items:center;gap:6px;">
+    <span style="font-size:16px;">🧷</span>
+    <span style="font-weight:700;font-size:13px;">Luiers</span>
   </div>
-  <div style="display:flex;gap:16px;margin:6px 0 2px;">
-    <div>
-      <div class="dk-getal">{nat_count}</div>
-      <div class="dk-sub">nat</div>
-    </div>
-    <div class="dk-scheidslijn"></div>
-    <div>
-      <div class="dk-getal">{vuil_count}</div>
-      <div class="dk-sub">vuil</div>
-    </div>
+  <span style="font-size:11px;color:#aaa;">{"laatste " + laatste_luier if laatste_luier else ""}</span>
+</div>
+<div style="display:flex;gap:16px;margin:4px 0 2px;">
+  <div>
+    <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;">{nat_count}</div>
+    <div style="font-size:11px;color:#aaa;">nat</div>
   </div>
-  <div style="margin-top:10px;">
-    <span style="background:#fdf4ff;color:#7c3aed;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{nat_count + vuil_count} totaal</span>
+  <div style="width:1px;background:#aaa;opacity:0.3;margin:4px 0;"></div>
+  <div>
+    <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;">{vuil_count}</div>
+    <div style="font-size:11px;color:#aaa;">vuil</div>
   </div>
-</div>""", unsafe_allow_html=True)
+</div>
+<div style="margin-top:10px;">
+  <span style="background:#fdf4ff;color:#7c3aed;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{nat_count + vuil_count} totaal</span>
+</div>
+""", unsafe_allow_html=True)
 
     dash_kaart(k4, "🎈", "Activiteiten",
                aantal_act, "vandaag",
@@ -513,44 +466,41 @@ if selected_tab == "Dashboard":
 
     # Gezondheidskaart
     if gez_datum:
-        st.markdown(f"""
-<div class="dash-kaart" style="border-radius:18px;padding:16px 18px;margin-bottom:12px;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <span style="font-size:16px;">🩺</span>
-      <span class="dk-titel">Gezondheid</span>
-    </div>
-    <span class="dk-tijd">meting {gez_datum}</span>
+        with st.container(border=True):
+            st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+  <div style="display:flex;align-items:center;gap:6px;">
+    <span style="font-size:16px;">🩺</span>
+    <span style="font-weight:700;font-size:13px;">Gezondheid</span>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-    <div>
-      <div class="dk-sub" style="margin-bottom:2px;">Gewicht</div>
-      <div class="dk-getal" style="font-size:16px;">{gewicht:.1f} <span class="dk-sub" style="font-size:11px;font-weight:400;">kg</span></div>
-    </div>
-    <div>
-      <div class="dk-sub" style="margin-bottom:2px;">Lengte</div>
-      <div class="dk-getal" style="font-size:16px;">{lengte:.1f} <span class="dk-sub" style="font-size:11px;font-weight:400;">cm</span></div>
-    </div>
-    <div>
-      <div class="dk-sub" style="margin-bottom:2px;">Temp.</div>
-      <div class="dk-getal" style="font-size:16px;">{temp:.1f} <span class="dk-sub" style="font-size:11px;font-weight:400;">°C</span></div>
-    </div>
+  <span style="font-size:11px;color:#aaa;">meting {gez_datum}</span>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+  <div>
+    <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Gewicht</div>
+    <div style="font-weight:700;font-size:16px;">{gewicht:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">kg</span></div>
   </div>
-</div>""", unsafe_allow_html=True)
+  <div>
+    <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Lengte</div>
+    <div style="font-weight:700;font-size:16px;">{lengte:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">cm</span></div>
+  </div>
+  <div>
+    <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Temp.</div>
+    <div style="font-weight:700;font-size:16px;">{temp:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">°C</span></div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
     # Timeline
     if timeline_html:
-        st.markdown(f"""
-<div class="dash-kaart" style="border-radius:18px;padding:16px 18px;">
-  <div class="dk-sub" style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px;">Vandaag</div>
-  {timeline_html}
-</div>""", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown(f"""
+<div style="font-weight:700;font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px;">Vandaag</div>
+{timeline_html}
+""", unsafe_allow_html=True)
     else:
-        st.markdown("""
-<div class="dash-kaart" style="border-radius:18px;padding:16px 18px;font-size:13px;text-align:center;">
-  Nog geen activiteit geregistreerd vandaag
-</div>""", unsafe_allow_html=True)
-
+        with st.container(border=True):
+            st.caption("Nog geen activiteit geregistreerd vandaag")
 
 
 # ------------------------------

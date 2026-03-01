@@ -276,100 +276,239 @@ selected_tab = st.session_state.selected_tab
 # ------------------------------
 if selected_tab == "Dashboard":
     baby_naam = inst.get('baby_naam', 'Bubbel')
-    st.markdown(f"""
-    <div style="padding: 8px 0 24px 0;">
-        <div><span class="bubbel-wordmark" style="font-size: 36px; font-weight: 700; letter-spacing: -0.5px;">Bubbel</span><span style="font-size: 36px; font-weight: 700; color: #7a9e72;">.</span></div>
-        <div class="bubbel-subtitle" style="font-size: 16px; margin-top: 4px;">Dagoverzicht van {baby_naam}</div>
-    </div>
-    """, unsafe_allow_html=True)
     vandaag = date.today()
+    datum_str = vandaag.strftime('%-d %B')
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # --- Data ophalen ---
+    slaap_df = baby_records[(baby_records['Type'] == 'Slaap') & (baby_records['Starttijd'].dt.date == vandaag)] if not baby_records.empty else pd.DataFrame()
+    voeding_df = baby_records[(baby_records['Type'] == 'Voeding') & (baby_records['Starttijd'].dt.date == vandaag)] if not baby_records.empty else pd.DataFrame()
+    luier_df = baby_records[(baby_records['Type'] == 'Luier') & (baby_records['Starttijd'].dt.date == vandaag)] if not baby_records.empty else pd.DataFrame()
+    act_vandaag = activiteiten[activiteiten['Starttijd'].dt.date == vandaag] if not activiteiten.empty else pd.DataFrame()
+    gez_df = baby_records[baby_records['Type'] == 'Gezondheid'] if not baby_records.empty else pd.DataFrame()
 
-    slaap_df = baby_records[(baby_records['Type'] == 'Slaap') & (baby_records['Starttijd'].dt.date == vandaag)]
-    if not slaap_df.empty:
-        aantal_slaap = len(slaap_df)
-        laatste_slaap = slaap_df.sort_values('Starttijd', ascending=False).iloc[0]['Starttijd'].strftime('%H:%M')
-        col1.metric("💤 Slaapjes vandaag", f"{aantal_slaap}", delta=f"Laatste: {laatste_slaap}")
+    # Slaap stats
+    aantal_slaap = len(slaap_df)
+    laatste_slaap = slaap_df.sort_values('Starttijd', ascending=False).iloc[0]['Starttijd'].strftime('%H:%M') if not slaap_df.empty else None
+    totaal_slaap_min = 0
+    if not slaap_df.empty and 'Eindtijd' in slaap_df.columns:
+        slaap_df2 = slaap_df.copy()
+        slaap_df2['Eindtijd'] = pd.to_datetime(slaap_df2['Eindtijd'], errors='coerce')
+        slaap_df2['duur'] = (slaap_df2['Eindtijd'] - slaap_df2['Starttijd']).dt.total_seconds() / 60
+        totaal_slaap_min = int(slaap_df2['duur'].fillna(0).sum())
+    slaap_tag = f"{totaal_slaap_min // 60}u {totaal_slaap_min % 60}m totaal" if totaal_slaap_min > 0 else "–"
+
+    # Voeding stats
+    aantal_voeding = len(voeding_df)
+    laatste_voeding = voeding_df.sort_values('Starttijd', ascending=False).iloc[0]['Starttijd'].strftime('%H:%M') if not voeding_df.empty else None
+    totaal_ml = voeding_df['Hoeveelheid'].sum() if not voeding_df.empty else 0
+
+    # Luier stats
+    nat_count = len(luier_df[luier_df['Type Luier'] == 'Nat']) if not luier_df.empty else 0
+    vuil_count = len(luier_df[luier_df['Type Luier'] == 'Vuil']) if not luier_df.empty else 0
+    laatste_luier = luier_df.sort_values('Starttijd', ascending=False).iloc[0]['Starttijd'].strftime('%H:%M') if not luier_df.empty else None
+
+    # Activiteiten stats
+    aantal_act = len(act_vandaag)
+    if not act_vandaag.empty:
+        laatste_act_row = act_vandaag.sort_values('Starttijd', ascending=False).iloc[0]
+        laatste_act_naam = laatste_act_row.get('Activiteit_type', '') if 'Activiteit_type' in laatste_act_row.index else ''
+        laatste_act_tijd = laatste_act_row['Starttijd'].strftime('%H:%M')
     else:
-        col1.metric("💤 Slaapjes vandaag", "0")
+        laatste_act_naam = '–'
+        laatste_act_tijd = None
 
-    voeding_df = baby_records[(baby_records['Type'] == 'Voeding') & (baby_records['Starttijd'].dt.date == vandaag)]
-    if not voeding_df.empty:
-        aantal_voeding = len(voeding_df)
-        laatste_voeding = voeding_df.sort_values('Starttijd', ascending=False).iloc[0]['Starttijd'].strftime('%H:%M')
-        totaal_ml = voeding_df['Hoeveelheid'].sum()
-        col2.metric("🍼 Voedingen vandaag", f"{aantal_voeding}", delta=f"Laatste: {laatste_voeding}")
-        col4.metric("💧 Totaal ml voeding vandaag", f"{totaal_ml:.1f} ml")
-    else:
-        col2.metric("🍼 Voedingen vandaag", "0")
-        col4.metric("💧 Totaal ml voeding vandaag", "0 ml")
-
-    luier_df = baby_records[(baby_records['Type'] == 'Luier') & (baby_records['Starttijd'].dt.date == vandaag)]
-    if not luier_df.empty:
-        nat_count = len(luier_df[luier_df['Type Luier'] == 'Nat'])
-        vuil_count = len(luier_df[luier_df['Type Luier'] == 'Vuil'])
-        laatste_luier = luier_df.sort_values('Starttijd', ascending=False).iloc[0]['Starttijd'].strftime('%H:%M')
-        col3.metric("🧷 Luiers vandaag", f"Nat: {nat_count}  Vuil: {vuil_count}", delta=f"Laatste: {laatste_luier}")
-    else:
-        col3.metric("🧷 Luiers vandaag", "Nat: 0  Vuil: 0")
-
-    if not activiteiten.empty:
-        act_vandaag = activiteiten[activiteiten['Starttijd'].dt.date == vandaag]
-        aantal_act = len(act_vandaag)
-        if aantal_act > 0:
-            laatste_act = act_vandaag.sort_values('Starttijd', ascending=False).iloc[0]
-            laatste_act_naam = laatste_act.get('Activiteit_type', '')
-            laatste_act_tijd = laatste_act['Starttijd'].strftime('%H:%M')
-            col5.metric("🎈 Activiteiten vandaag", f"{aantal_act}", delta=f"Laatste: {laatste_act_naam} {laatste_act_tijd}")
-        else:
-            col5.metric("🎈 Activiteiten vandaag", "0")
-    else:
-        col5.metric("🎈 Activiteiten vandaag", "0")
-
-    # Lage voorraad waarschuwingen
-    if not voorraad.empty:
-        lage_voorraad = []
-        for _, r in voorraad.iterrows():
-            actueel = int(pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0)
-            minimum = int(pd.to_numeric(r.get('Minimum voorraad', 0), errors='coerce') or 0)
-            if actueel <= minimum:
-                naam = r.get('Productnaam', 'Onbekend')
-                eenheid = r.get('Eenheid', 'stuks')
-                variant = r.get('Variant', '')
-                label = f"{naam}" + (f" ({variant})" if variant else "")
-                lage_voorraad.append(f"**{label}** — nog {actueel} {eenheid}")
-        if lage_voorraad:
-            st.warning("⚠️ Lage voorraad: " + "  |  ".join(lage_voorraad))
-
-    gez_df = baby_records[baby_records['Type'] == 'Gezondheid']
+    # Gezondheid
     if not gez_df.empty:
         laatste_gez = gez_df.sort_values('Starttijd', ascending=False).iloc[0]
-        tijd = laatste_gez['Starttijd'].strftime('%H:%M')
-        try:
-            gewicht = float(str(laatste_gez.get('Gewicht', 0)).replace(',', '.'))
-        except:
-            gewicht = 0.0
-        try:
-            lengte = float(str(laatste_gez.get('Lengte', 0)).replace(',', '.'))
-        except:
-            lengte = 0.0
-        try:
-            temp = float(str(laatste_gez.get('Temperatuur', 0)).replace(',', '.'))
-        except:
-            temp = 0.0
-        opmerkingen = laatste_gez.get('Opmerkingen / ziekten', 'Geen')
-        with st.expander("🩺 Laatste gezondheid record"):
-            st.markdown(f"""
-            **Tijdstip:** {tijd}  
-            **Gewicht:** {gewicht:.1f} kg  
-            **Lengte:** {lengte:.1f} cm  
-            **Temperatuur:** {temp:.1f} °C  
-            **Opmerkingen:** {opmerkingen if opmerkingen else 'Geen'}
-            """)
+        gez_datum = laatste_gez['Starttijd'].strftime('%-d %b')
+        try: gewicht = float(str(laatste_gez.get('Gewicht', 0)).replace(',', '.'))
+        except: gewicht = 0.0
+        try: lengte = float(str(laatste_gez.get('Lengte', 0)).replace(',', '.'))
+        except: lengte = 0.0
+        try: temp = float(str(laatste_gez.get('Temperatuur', 0)).replace(',', '.'))
+        except: temp = 0.0
     else:
-        with st.expander("🩺 Laatste gezondheid record"):
-            st.info("Geen gegevens beschikbaar")
+        gez_datum = gewicht = lengte = temp = None
+
+    # Voorraad waarschuwingen
+    voorraad_items_html = ""
+    if not voorraad.empty:
+        for _, r in voorraad.iterrows():
+            act = pd.to_numeric(r.get('Actuele voorraad', 0), errors='coerce') or 0
+            mn = pd.to_numeric(r.get('Minimum voorraad', 0), errors='coerce') or 0
+            if mn > 0 and act <= mn * 1.2:
+                p_naam = r.get('Productnaam', '')
+                p_eenh = r.get('Eenheid', '')
+                is_laag = act <= mn
+                kleur = "#b42318" if is_laag else "#b54708"
+                voorraad_items_html += f'<div style="font-size:12px;color:{kleur};margin-top:2px;">{p_naam} — nog {act:.0f} {p_eenh}</div>'
+
+    # Timeline opbouwen uit alle records van vandaag
+    timeline_items = []
+    if not slaap_df.empty:
+        for _, r in slaap_df.iterrows():
+            timeline_items.append(("💤", r['Starttijd'], "Slaap gestart", "#e8f4fd"))
+            if pd.notna(r.get('Eindtijd')) and r.get('Eindtijd') != '':
+                eind = pd.to_datetime(r.get('Eindtijd'), errors='coerce')
+                if pd.notna(eind):
+                    timeline_items.append(("☀️", eind, "Wakker", "#fff9e6"))
+    if not voeding_df.empty:
+        for _, r in voeding_df.iterrows():
+            hoev = r.get('Hoeveelheid', '')
+            vtype = r.get('Voeding_type', '')
+            label = f"{vtype} {hoev:.0f}ml" if hoev and float(hoev) > 0 else vtype
+            timeline_items.append(("🍼", r['Starttijd'], label, "#f0fdf4"))
+    if not luier_df.empty:
+        for _, r in luier_df.iterrows():
+            ltype = r.get('Type Luier', 'Luier')
+            timeline_items.append(("🧷", r['Starttijd'], f"Luier {ltype.lower()}", "#fdf4ff"))
+    if not act_vandaag.empty:
+        for _, r in act_vandaag.iterrows():
+            anaam = r.get('Activiteit_type', 'Activiteit') if 'Activiteit_type' in r.index else 'Activiteit'
+            timeline_items.append(("🐛", r['Starttijd'], anaam, "#fff7ed"))
+
+    timeline_items.sort(key=lambda x: x[1], reverse=True)
+
+    timeline_html = ""
+    for icon, tijd, label, bg in timeline_items:
+        tijd_str = tijd.strftime('%H:%M') if pd.notna(tijd) else ''
+        timeline_html += f"""
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;position:relative;">
+  <div style="width:28px;height:28px;border-radius:50%;background:{bg};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">{icon}</div>
+  <div style="flex:1;font-size:13px;font-weight:500;">{label}</div>
+  <div style="font-size:11px;color:#bbb;white-space:nowrap;">{tijd_str}</div>
+</div>"""
+
+    # --- Render ---
+    st.markdown(f"""
+<style>
+@media (max-width: 640px) {{
+    .dash-grid {{ grid-template-columns: 1fr 1fr !important; }}
+}}
+</style>
+<div style="margin-bottom:20px;">
+  <div style="font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1.1;">Bubbel<span style="color:#7a9e72;">.</span></div>
+  <div style="font-size:13px;color:#aaa;margin-top:3px;">Dagoverzicht van {baby_naam} · {datum_str}</div>
+</div>
+""", unsafe_allow_html=True)
+
+    # Voorraad banner
+    if voorraad_items_html:
+        st.markdown(f"""
+<div style="background:#fef3f2;border:1px solid #fecdca;border-radius:14px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;">
+  <span style="font-size:18px;">⚠️</span>
+  <div>
+    <div style="font-weight:700;font-size:13px;color:#b42318;margin-bottom:2px;">Lage voorraad</div>
+    {voorraad_items_html}
+  </div>
+</div>""", unsafe_allow_html=True)
+
+    # Kaarten 2x2
+    k1, k2 = st.columns(2)
+    k3, k4 = st.columns(2)
+
+    def dash_kaart(col, icon, titel, getal, subtekst, tag_tekst, tag_bg, tag_kleur, laatste=None):
+        laatste_html = f'<span style="font-size:11px;color:#bbb;">{laatste}</span>' if laatste else ''
+        col.markdown(f"""
+<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;height:100%;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:16px;">{icon}</span>
+      <span style="font-weight:700;font-size:13px;">{titel}</span>
+    </div>
+    {laatste_html}
+  </div>
+  <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;margin:6px 0 2px;">{getal}</div>
+  <div style="font-size:11px;color:#aaa;margin-bottom:10px;">{subtekst}</div>
+  <span style="background:{tag_bg};color:{tag_kleur};font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{tag_tekst}</span>
+</div>""", unsafe_allow_html=True)
+
+    dash_kaart(k1, "💤", "Slaap",
+               aantal_slaap, "slaapjes vandaag", slaap_tag,
+               "#e8f4fd", "#1a6fa8",
+               laatste=f"laatste {laatste_slaap}" if laatste_slaap else None)
+
+    dash_kaart(k2, "🍼", "Voeding",
+               aantal_voeding, "voedingen vandaag",
+               f"{totaal_ml:.0f} ml totaal" if totaal_ml > 0 else "–",
+               "#f0fdf4", "#166534",
+               laatste=f"laatste {laatste_voeding}" if laatste_voeding else None)
+
+    # Luiers kaart apart (twee getallen)
+    k3.markdown(f"""
+<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;height:100%;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:16px;">🧷</span>
+      <span style="font-weight:700;font-size:13px;">Luiers</span>
+    </div>
+    <span style="font-size:11px;color:#bbb;">{"laatste " + laatste_luier if laatste_luier else ""}</span>
+  </div>
+  <div style="display:flex;gap:16px;margin:6px 0 2px;">
+    <div>
+      <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;">{nat_count}</div>
+      <div style="font-size:11px;color:#aaa;">nat</div>
+    </div>
+    <div style="width:1px;background:#f0f0f0;margin:4px 0;"></div>
+    <div>
+      <div style="font-size:34px;font-weight:800;letter-spacing:-1px;line-height:1;">{vuil_count}</div>
+      <div style="font-size:11px;color:#aaa;">vuil</div>
+    </div>
+  </div>
+  <div style="margin-top:10px;">
+    <span style="background:#fdf4ff;color:#7c3aed;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;">{nat_count + vuil_count} totaal</span>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+    dash_kaart(k4, "🎈", "Activiteiten",
+               aantal_act, "vandaag",
+               laatste_act_naam if laatste_act_naam != '–' else "–",
+               "#fff7ed", "#c2410c",
+               laatste=f"{laatste_act_tijd}" if laatste_act_tijd else None)
+
+    st.write("")
+
+    # Gezondheidskaart
+    if gez_datum:
+        st.markdown(f"""
+<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;margin-bottom:12px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:16px;">🩺</span>
+      <span style="font-weight:700;font-size:13px;">Gezondheid</span>
+    </div>
+    <span style="font-size:11px;color:#bbb;">meting {gez_datum}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+    <div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Gewicht</div>
+      <div style="font-weight:700;font-size:16px;">{gewicht:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">kg</span></div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Lengte</div>
+      <div style="font-weight:700;font-size:16px;">{lengte:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">cm</span></div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:2px;">Temp.</div>
+      <div style="font-weight:700;font-size:16px;">{temp:.1f} <span style="font-weight:400;font-size:11px;color:#aaa;">°C</span></div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+    # Timeline
+    if timeline_html:
+        st.markdown(f"""
+<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;">
+  <div style="font-weight:700;font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px;">Vandaag</div>
+  {timeline_html}
+</div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("""
+<div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;color:#bbb;font-size:13px;text-align:center;">
+  Nog geen activiteit geregistreerd vandaag
+</div>""", unsafe_allow_html=True)
+
+
 
 # ------------------------------
 # TAB: Slaap
@@ -995,7 +1134,7 @@ if selected_tab == "Analyse":
                     y='Aantal:Q',
                     color=alt.Color('Reactie:N', scale=alt.Scale(
                         domain=['Boos', 'Huilerig', 'Neutraal', 'Blij', 'Heel blij'],
-                        range=['#c0392b', '#e74c3c', '#95a5a6', '#2ecc71', '#27ae60']
+                        range=['#d63031', '#e17055', '#b2bec3', '#00b894', '#00635a']
                     )),
                     tooltip=['Activiteit_type', 'Reactie', 'Aantal']
                 ).properties(height=250)

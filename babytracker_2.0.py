@@ -407,13 +407,6 @@ if selected_tab == "Dashboard":
     # Kaarten 2x2
     k1, k2 = st.columns(2)
     k3, k4 = st.columns(2)
-    st.markdown("""
-    <style>
-    div[data-testid="stHorizontalBlock"] + div[data-testid="stHorizontalBlock"] {
-        margin-top: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
     def dash_kaart(col, icon, titel, getal, subtekst, tag_tekst, tag_bg, tag_kleur, laatste=None):
         laatste_html = f'<span style="font-size:11px;color:#bbb;">{laatste}</span>' if laatste else ''
@@ -441,6 +434,8 @@ if selected_tab == "Dashboard":
                f"{totaal_ml:.0f} ml totaal" if totaal_ml > 0 else "–",
                "#f0fdf4", "#166534",
                laatste=f"laatste {laatste_voeding}" if laatste_voeding else None)
+
+    st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
 
     # Luiers kaart apart (twee getallen)
     k3.markdown(f"""

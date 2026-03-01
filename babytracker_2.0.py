@@ -435,8 +435,6 @@ if selected_tab == "Dashboard":
                "#f0fdf4", "#166534",
                laatste=f"laatste {laatste_voeding}" if laatste_voeding else None)
 
-    st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-
     # Luiers kaart apart (twee getallen)
     k3.markdown(f"""
 <div style="border:1.5px solid #efefef;border-radius:18px;padding:16px 18px;height:100%;">

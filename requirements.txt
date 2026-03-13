@@ -1,10 +1,7 @@
 streamlit
-pandas
-numpy
-python-dateutil
-pytz
-gspread
-google-auth
-altair
+supabase
+streamlit-cookies-controller
 streamlit-option-menu
-streamlit-extras
+pandas
+altair
+plotly

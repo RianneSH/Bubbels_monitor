@@ -17,6 +17,9 @@ st.set_page_config(page_title="Bubbel.", page_icon="🫧", layout="wide")
 st.markdown("""
 <style>
     .block-container { padding-top: 3.5rem !important; }
+    header[data-testid="stHeader"] { display: none !important; }
+    #MainMenu { display: none !important; }
+    footer { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
